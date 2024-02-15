@@ -4,7 +4,6 @@ from typing import Union
 
 import pandas as pd
 import tqdm.contrib.concurrent
-
 from fast_bioservices.log import logger
 from fast_bioservices.nodes import Input, Output, Taxon
 from fast_bioservices.utils import HTTP, flatten
@@ -58,6 +57,21 @@ class BioDBNet:
             return False
         return True
     
+    def getDirectOutputsForInput(self, input: str) -> list[str]:
+        url = f"{self._url}?method=getdirectoutputsforinput&input={input}"
+        outputs = self._http.get_json(url)["output"]
+        return outputs
+    
+    def getInputs(self) -> list[str]:
+        url = f"{self._url}?method=getinputs"
+        inputs = self._http.get_json(url)["input"]
+        return inputs
+    
+    def getOutputsForInput(self, input: str) -> list[str]:
+        url = f"{self._url}?method=getoutputsforinput&input={input}"
+        valid_outputs: list[str] = self._http.get_json(url)["output"]
+        return valid_outputs
+    
     def db2db(
         self,
         input_db: Input,
@@ -99,9 +113,3 @@ class BioDBNet:
 
 if __name__ == '__main__':
     biodbnet = BioDBNet(cache=True, show_progress=False)
-    df = biodbnet.db2db(
-        Input.GENE_ID, [Output.GENE_SYMBOL, Output.ENSEMBL_GENE_ID],
-        [str(i) for i in range(1000)],
-        Taxon.HOMO_SAPIENS,
-    )
-    print(df)
