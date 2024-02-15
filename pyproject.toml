@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "fast-bioservices"
+version = "0.1.0"
+description = ""
+authors = ["Josh Loecker <joshloecker@icloud.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+appdirs = "^1.4.4"
+pandas = { version = ">1.5.8,<3", extras = ["pyarrow"] }
+requests = "^2.31.0"
+requests-cache = "<2"
+tqdm = ">=4.42.0"
+
+
+[tool.poetry.dev-dependencies]
+yappi = "^1.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
