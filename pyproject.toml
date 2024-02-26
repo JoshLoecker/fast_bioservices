@@ -5,14 +5,18 @@ description = ""
 authors = ["Josh Loecker <joshloecker@icloud.com>"]
 readme = "README.md"
 
+[tool.ruff]
+exclude = ["__init__.py"]
+
+
 [tool.poetry.dependencies]
-python = ">=3.8,<4.0"
+python = ">=3.8,<3.12"
 appdirs = "^1.4.4"
 pandas = { version = ">1.5.8,<3", extras = ["pyarrow"] }
 requests = "^2.31.0"
 requests-cache = "<2"
 tqdm = ">=4.42.0"
-
+modguard = "^0"
 
 [tool.poetry.dev-dependencies]
 yappi = "^1.6.0"
