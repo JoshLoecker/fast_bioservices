@@ -29,6 +29,7 @@ class Input(Enum):
     """
     These are valid input database types for the BioDBNet API.
     """
+
     AFFY_GENECHIP_ARRAY = "Affy GeneChip Array"
     AFFY_ID = "Affy ID"
     AFFY_TRANSCRIPT_CLUSTER_ID = "Affy Transcript Cluster ID"
@@ -99,6 +100,7 @@ class Output(Enum):
     """
     These are valid output database types for the BioDBNet API.
     """
+
     AFFY_ANNOTATION = "Affy Annotation"
     AFFY_ID = "Affy ID"
     AGILENT_ID = "Agilent ID"
@@ -299,3 +301,7 @@ class Output(Enum):
     WORMPEP_PROTEIN_ID = "WormPep Protein ID"
     XENBASE_GENE_ID = "XenBase Gene ID"
     ZFIN_ID = "ZFIN ID"
+
+
+if __name__ == "__main__":
+    print(Input["GENE_ID"].value)
