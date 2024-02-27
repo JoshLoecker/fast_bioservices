@@ -15,12 +15,13 @@ appdirs = "^1.4.4"
 pandas = { version = ">1.5.8,<3", extras = ["pyarrow"] }
 requests = "^2.31.0"
 requests-cache = "<2"
-tqdm = ">=4.42.0"
 modguard = "^0"
+tqdm = ">=4.42.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.test.dependencies]
 yappi = "^1.6.0"
 pytest = "^8.0"
+pytest-xdist = "^3.0.2"
 
 [build-system]
 requires = ["poetry-core"]
