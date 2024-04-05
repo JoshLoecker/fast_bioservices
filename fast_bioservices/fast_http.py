@@ -1,3 +1,4 @@
+import time
 import urllib
 import urllib.parse
 import urllib.request
@@ -7,9 +8,8 @@ from typing import List, Optional, Union
 import httpx
 import httpx_cache
 import modguard
-
-from fast_bioservices.log import logger
-from fast_bioservices.settings import cache_name
+from log import logger
+from settings import cache_name
 
 
 class HTTP:
@@ -26,13 +26,16 @@ class HTTP:
         max_requests_per_second: Optional[int] = None,
     ) -> None:
         self._use_cache: bool = cache
-        self._max_requests_per_second: int = (
-            int(1e10) if max_requests_per_second is None else max_requests_per_second
-        )
+        self._max_requests_per_second: int = int(1e10)
+        if max_requests_per_second is not None:
+            self._max_requests_per_second = max_requests_per_second
 
         if not self._use_cache:
             HTTP._client.headers["cache-control"] = "no-cache"
         self._client = HTTP._client
+
+        self._requests_made: int = 0
+        self._last_request_time: float = 0
 
     def _get(
         self,
@@ -42,6 +45,12 @@ class HTTP:
         parts = urllib.parse.urlparse(url)
         url = urllib.parse.quote(url, safe="%/:=&?~#+!$,;'@()*[]")
         logger.debug(f"Getting {url}")
+
+        # Perform rate limiting based
+        time_since_last_request = time.time() - self._last_request_time
+        if time_since_last_request < 1 / self._max_requests_per_second:
+            time.sleep(1 / self._max_requests_per_second - time_since_last_request)
+        self._last_request_time = time.time()
 
         try:
             if _internal_check:
