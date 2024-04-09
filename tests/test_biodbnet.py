@@ -4,18 +4,19 @@ import pytest
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 
-@pytest.fixture
+# Make biodbnet_instance exist for the lifetime of the tests
+@pytest.fixture(scope="session")
 def biodbnet_instance():
     return BioDBNet(cache=False, show_progress=False)
 
 
 @pytest.fixture
-def gene_ids():
+def gene_ids(scope="session"):
     return ["4318", "1376", "2576", "10089"]
 
 
 @pytest.fixture
-def gene_symbols():
+def gene_symbols(scope="session"):
     return ["MMP9", "CPT2", "GAGE4", "KCNK7"]
 
 
@@ -32,6 +33,7 @@ def test_dbOrg(biodbnet_instance):
 
 def test_getDirectOutputsForInput(biodbnet_instance):
     result = biodbnet_instance.getDirectOutputsForInput(Input.GENE_ID)
+    print(result)
 
     assert len(result) > 0
     assert isinstance(result, list)
@@ -109,13 +111,16 @@ def test_dbOrtho(biodbnet_instance, gene_ids):
         assert id_ in result["Gene ID"].values
 
 
+@pytest.mark.skip(reason="dbAnnot tests not yet written")
 def test_dbAnnot(biodbnet_instance):
     pass
 
 
+@pytest.mark.skip(reason="getAllPathways tests not yet written")
 def test_getAllPathways(biodbnet_instance):
     pass
 
 
+@pytest.mark.skip(reason="getPathwayFromDatabase tests not yet written")
 def test_getPathwayFromDatabase(biodbnet_instance):
     pass
