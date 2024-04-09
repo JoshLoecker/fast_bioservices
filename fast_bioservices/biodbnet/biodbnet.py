@@ -59,7 +59,7 @@ class BioDBNet(BaseModel, FastHTTP):
         self._show_progress = value
 
     def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
-        result = self.get(url).json()
+        result = self._get(url).json()
         progress_bar.update(task, advance=1)
         return result
 
@@ -93,7 +93,7 @@ class BioDBNet(BaseModel, FastHTTP):
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self._max_workers
             ) as executor:
-                results = list(executor.map(self.get, urls))
+                results = list(executor.map(self._get, urls))
                 results = [r.json() for r in results]
 
         if as_dataframe:
@@ -140,24 +140,24 @@ class BioDBNet(BaseModel, FastHTTP):
 
             logger.debug(f"Validating taxon ID '{t}'")
             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-            if "No items found." in self.get(taxon_url, temp_disable_cache=True).text:
+            if "No items found." in self._get(taxon_url, temp_disable_cache=True).text:
                 raise ValueError(f"Unable to find taxon '{t}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
         return taxon_list[0] if len(taxon_list) == 1 else taxon_list
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        outputs = self.get(url, temp_disable_cache=True).json()
+        outputs = self._get(url, temp_disable_cache=True).json()
         return outputs["output"]
 
     def getInputs(self) -> List[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self.get(url, temp_disable_cache=True).json()
+        inputs = self._get(url, temp_disable_cache=True).json()
         return inputs["input"]
 
     def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs = self.get(url, temp_disable_cache=True).json()
+        valid_outputs = self._get(url, temp_disable_cache=True).json()
         return valid_outputs["output"]
 
     def getAllPathways(
@@ -168,7 +168,7 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon_id = self._validate_taxon_id(taxon)
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
-        result = self.get(url).json()
+        result = self._get(url).json()
         if as_dataframe:
             return pd.DataFrame(result)
         return result  # type: ignore
@@ -188,7 +188,7 @@ class BioDBNet(BaseModel, FastHTTP):
             pathways = [pathways]
 
         url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
-        result = self.get(url).json()
+        result = self._get(url).json()
 
         if as_dataframe:
             return pd.DataFrame(result)
@@ -410,7 +410,7 @@ class BioDBNet(BaseModel, FastHTTP):
         output_db_val = output_db.value.replace(" ", "_")
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
-        buffer = io.StringIO(self.get(url).text)
+        buffer = io.StringIO(self._get(url).text)
         return pd.read_csv(
             buffer, sep="\t", header=None, names=[input_db.value, output_db.value]
         )
