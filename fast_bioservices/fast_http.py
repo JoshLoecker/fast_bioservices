@@ -39,10 +39,10 @@ class FastHTTP(ABC):
     def __del__(self):
         self._client.close()
 
-    def get(
+    def _get(
         self,
         url: str,
-        temp_disable_cache: bool = True,
+        temp_disable_cache: bool = False,
     ) -> httpx.Response:
         parts = urllib.parse.urlparse(url)
         url = urllib.parse.quote(url, safe="%/:=&?~#+!$,;'@()*[]")
