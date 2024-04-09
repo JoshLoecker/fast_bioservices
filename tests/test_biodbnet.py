@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 
@@ -22,16 +23,16 @@ def test_dbOrg(biodbnet_instance):
     result = biodbnet_instance.dbOrg(
         input_db=Input.ENSEMBL_GENE_ID,
         output_db=Output.GENE_ID,
-        taxon=Taxon.HOMO_SAPIENS
+        taxon=Taxon.HOMO_SAPIENS,
     )
-    
+
     assert isinstance(result, pd.DataFrame)
     assert len(result) > 0
 
 
 def test_getDirectOutputsForInput(biodbnet_instance):
     result = biodbnet_instance.getDirectOutputsForInput(Input.GENE_ID)
-    
+
     assert len(result) > 0
     assert isinstance(result, list)
 
@@ -53,13 +54,13 @@ def test_db2db(biodbnet_instance, gene_ids, gene_symbols):
         input_values=gene_ids,
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
-        taxon=Taxon.HOMO_SAPIENS
+        taxon=Taxon.HOMO_SAPIENS,
     )
-    
+
     assert "Gene ID" in result.columns
-    assert "Gene Symbol" in result.columns  # NOSONAR
-    
-    for (id_, symbol) in zip(gene_ids, gene_symbols):
+    assert "Gene Symbol" in result.columns
+
+    for id_, symbol in zip(gene_ids, gene_symbols):
         assert id_ in result["Gene ID"].values
         assert symbol in result["Gene Symbol"].values
 
@@ -68,30 +69,26 @@ def test_dbWalk(biodbnet_instance):
     result = biodbnet_instance.dbWalk(
         input_values=["4318", "1376", "2576", "10089"],
         db_path=[Input.GENE_ID, Input.GENE_SYMBOL],
-        taxon=Taxon.HOMO_SAPIENS
+        taxon=Taxon.HOMO_SAPIENS,
     )
-    
+
     assert len(result) == 4
 
 
 @pytest.mark.skip(reason="dbReport not yet implemented")
 def test_dbReport(biodbnet_instance):
     result = biodbnet_instance.dbReport(
-        input_values=["4318"],
-        input_db=Input.GENE_ID,
-        taxon=Taxon.HOMO_SAPIENS
+        input_values=["4318"], input_db=Input.GENE_ID, taxon=Taxon.HOMO_SAPIENS
     )
 
 
 def test_dbFind(biodbnet_instance, gene_ids, gene_symbols):
     result = biodbnet_instance.dbFind(
-        input_values=gene_ids,
-        output_db=Output.GENE_SYNONYMS,
-        taxon=Taxon.HOMO_SAPIENS
+        input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS
     )
-    
+
     assert len(result) == 4
-    for (id_, symbol) in zip(gene_ids, gene_symbols):
+    for id_, symbol in zip(gene_ids, gene_symbols):
         assert id_ in result["InputValue"].values
         assert symbol in result["Gene Symbol"].values
 
@@ -102,11 +99,11 @@ def test_dbOrtho(biodbnet_instance, gene_ids):
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         input_taxon=Taxon.HOMO_SAPIENS,
-        output_taxon=Taxon.MUS_MUSCULUS
+        output_taxon=Taxon.MUS_MUSCULUS,
     )
-    
+
     assert len(result) == 4
-    
+
     # symbols are from Mus Musculus, not checking those
     for id_ in zip(gene_ids):
         assert id_ in result["Gene ID"].values
