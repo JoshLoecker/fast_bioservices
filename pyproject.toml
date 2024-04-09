@@ -1,12 +1,9 @@
 [tool.poetry]
-name = "fast-bioservices"
+name = "fast_bioservices"
 version = "0.1.0"
 description = ""
 authors = ["Josh Loecker <joshloecker@icloud.com>"]
 readme = "README.md"
-
-[tool.ruff]
-exclude = ["__init__.py"]
 
 
 [tool.poetry.dependencies]
@@ -17,7 +14,6 @@ httpx-cache = "0.13.0"
 modguard = "^0"
 pandas = { version = ">1.5.8,<3", extras = ["pyarrow"] }
 rich = "^13.7.1"
-# tqdm = ">=4.42.0"
 
 
 [tool.poetry.group.test.dependencies]
