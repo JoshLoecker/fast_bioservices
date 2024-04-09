@@ -1,41 +1,42 @@
 import concurrent.futures
 import functools
 import io
-import os
 import urllib.parse
 from typing import List, Literal, Union
 
-import modguard
 import pandas as pd
 from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
 
-from fast_bioservices.fast_http import HTTP
+from fast_bioservices.base import BaseModel
+from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
+from fast_bioservices.fast_http import FastHTTP
 from fast_bioservices.log import logger
-from fast_bioservices.nodes import Input, Output, Taxon
 from fast_bioservices.utils import flatten
 
 
-class BioDBNet:
+class BioDBNet(BaseModel, FastHTTP):
     _url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
 
     def __init__(
         self,
-        max_workers: int = 100,
         show_progress: bool = True,
         cache: bool = True,
     ):
+        # Initialize parent classes
+        BaseModel.__init__(self, show_progress=show_progress)
+        FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
+
         self._chunk_size: int = 250
         self._worker_limit: int = 10
-        self._max_workers: int = max_workers
-        self._http: HTTP = HTTP(cache=cache, max_requests_per_second=10)
-        self._show_progress: bool = show_progress
 
-    @modguard.public
+    @property
+    def url(self) -> str:
+        return self._url
+
     @property
     def max_workers(self) -> int:
         return self._max_workers
 
-    @modguard.public
     @max_workers.setter
     def max_workers(self, value: int) -> None:
         if value < 1:
@@ -49,20 +50,17 @@ class BioDBNet:
 
         self._max_workers = value
 
-    @modguard.public
     @property
     def show_progress(self) -> bool:
         return self._show_progress
 
-    @modguard.public
     @show_progress.setter
     def show_progress(self, value: bool) -> None:
         self._show_progress = value
 
     def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
-        result = self._http.get_json(url)
+        result = self.get(url).json()
         progress_bar.update(task, advance=1)
-
         return result
 
     def _execute(
@@ -71,12 +69,12 @@ class BioDBNet:
         as_dataframe: bool = True,
     ) -> Union[pd.DataFrame, List[dict]]:
         logger.debug(f"Collecting information for {len(urls)} sets of urls")
-        self._http.warned = False
+        self.warned = False
         if self._show_progress:
             with Progress(
                 "[progress.description]{task.description}",
                 BarColumn(),
-                "{task.completed}/{task.total}",
+                "{task.completed}/{task.total} batches",
                 "[progress.percentage]{task.percentage:>3.0f}%",
                 TimeRemainingColumn(),
             ) as progress:
@@ -95,7 +93,8 @@ class BioDBNet:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self._max_workers
             ) as executor:
-                results = list(executor.map(self._http.get_json, urls))
+                results = list(executor.map(self.get, urls))
+                results = [r.json() for r in results]
 
         if as_dataframe:
             results: list = flatten(results)
@@ -132,57 +131,48 @@ class BioDBNet:
 
     def _validate_taxon_id(
         self,
-        taxon: Union[int, Taxon, List[int], List[Taxon]],
+        taxon: Union[int, Taxon, List[Union[int, Taxon]]],
     ) -> Union[int, List[int]]:
-        taxon_list: list[int] = []
-        if isinstance(taxon, Taxon):
-            taxon_list.append(taxon.value)
-        elif isinstance(taxon, List):
-            if isinstance(taxon[0], Taxon):
-                taxon_list.extend([t.value for t in taxon])  # type: ignore
-            else:
-                t: int
-                taxon_list.extend([t for t in taxon])  # type: ignore
-
+        taxon_list = [taxon] if isinstance(taxon, (int, Taxon)) else taxon
         for t in taxon_list:
+            if isinstance(t, Taxon):
+                t = t.value
+
             logger.debug(f"Validating taxon ID '{t}'")
             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-            if "No items found." in self._http._get_internal_text(taxon_url):
+            if "No items found." in self.get(taxon_url, temp_disable_cache=True).text:
                 raise ValueError(f"Unable to find taxon '{t}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
         return taxon_list[0] if len(taxon_list) == 1 else taxon_list
 
-    @modguard.public
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
-        url = f"{self._url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        outputs = self._http._get_internal_json(url)["output"]
-        return outputs
+        url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}"
+        outputs = self.get(url, temp_disable_cache=True).json()
+        return outputs["output"]
 
-    @modguard.public
     def getInputs(self) -> List[str]:
-        url = f"{self._url}?method=getinputs"
-        inputs = self._http._get_internal_json(url)["input"]
-        return inputs
+        url = f"{self.url}?method=getinputs"
+        inputs = self.get(url, temp_disable_cache=True).json()
+        return inputs["input"]
 
-    @modguard.public
     def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
-        url = f"{self._url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs: list[str] = self._http._get_internal_json(url)["output"]
-        return valid_outputs
+        url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
+        valid_outputs = self.get(url, temp_disable_cache=True).json()
+        return valid_outputs["output"]
 
-    @modguard.public
     def getAllPathways(
-        self, taxon: Union[Taxon, int], as_dataframe: bool = False
+        self,
+        taxon: Union[Taxon, int],
+        as_dataframe: bool = False,
     ) -> Union[pd.DataFrame, List[dict[str, str]]]:
         taxon_id = self._validate_taxon_id(taxon)
 
-        url = f"{self._url}?method=getpathways&pathways=1&taxonId={taxon_id}"
-        result = self._http.get_json(url)
+        url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
+        result = self.get(url).json()
         if as_dataframe:
             return pd.DataFrame(result)
         return result  # type: ignore
 
-    @modguard.public
     def getPathwayFromDatabase(
         self,
         pathways: Union[
@@ -197,14 +187,13 @@ class BioDBNet:
         if isinstance(pathways, str):
             pathways = [pathways]
 
-        url = f"{self._url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
-        result = self._http.get_json(url)
+        url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
+        result = self.get(url).json()
 
         if as_dataframe:
             return pd.DataFrame(result)
         return result  # type: ignore
 
-    @modguard.public
     def db2db(
         self,
         input_values: List[str],
@@ -235,7 +224,7 @@ class BioDBNet:
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
-            urls.append(self._url + "?method=db2db&format=row")
+            urls.append(self.url + "?method=db2db&format=row")
             urls[-1] += f"&input={input_db.value}"
             urls[-1] += f"&outputs={output_db_value}"
             urls[-1] += (
@@ -249,7 +238,6 @@ class BioDBNet:
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df  # type: ignore
 
-    @modguard.public
     def dbWalk(
         self,
         input_values: List[str],
@@ -272,7 +260,7 @@ class BioDBNet:
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
-            urls.append(self._url + "?method=dbwalk&format=row")
+            urls.append(self.url + "?method=dbwalk&format=row")
             urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
             urls[-1] += f"&dbPath={'->'.join(databases)}"
             urls[-1] += f"&taxonId={taxon_id}"
@@ -283,7 +271,6 @@ class BioDBNet:
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df
 
-    @modguard.public
     def dbReport(
         self,
         input_values: List[str],
@@ -294,14 +281,13 @@ class BioDBNet:
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
-            urls.append(self._url + "?method=dbreport&format=row")
+            urls.append(self.url + "?method=dbreport&format=row")
             urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
             urls[-1] += f"inputValues={','.join(input_values[i:i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
 
         return NotImplementedError
 
-    @modguard.public
     def dbFind(
         self,
         input_values: List[str],
@@ -316,7 +302,7 @@ class BioDBNet:
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
-                urls.append(self._url + "?method=dbfind&format=row")
+                urls.append(self.url + "?method=dbfind&format=row")
                 urls[-1] += (
                     f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
                 )
@@ -336,7 +322,6 @@ class BioDBNet:
             )
         return master_df
 
-    @modguard.public
     def dbOrtho(
         self,
         input_values: list[str],
@@ -354,7 +339,7 @@ class BioDBNet:
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
-                urls.append(self._url + "?method=dbortho")
+                urls.append(self.url + "?method=dbortho")
                 urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
                 urls[-1] += (
                     f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
@@ -383,7 +368,6 @@ class BioDBNet:
 
         return master_df
 
-    @modguard.public
     def dbAnnot(
         self,
         input_values: List[str],
@@ -404,17 +388,16 @@ class BioDBNet:
         annotations_ = [a.replace(" ", "").lower() for a in annotations]
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
-            urls.append(self._url + "?method=dbannot")
+            urls.append(self.url + "?method=dbannot")
             urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
             urls[-1] += f"&annotations={','.join(annotations_)}"
             urls[-1] += "&format=row"
 
-        df = self._execute(urls)
-        df = df.rename(columns={"InputValue": "Input Value"})  # type: ignore
+        df = pd.DataFrame(self._execute(urls))
+        df = df.rename(columns={"InputValue": "Input Value"})
         return df
 
-    @modguard.public
     def dbOrg(
         self,
         input_db: Input,
@@ -427,7 +410,7 @@ class BioDBNet:
         output_db_val = output_db.value.replace(" ", "_")
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
-        buffer = io.StringIO(self._http.get_text(url))
+        buffer = io.StringIO(self.get(url).text)
         return pd.read_csv(
             buffer, sep="\t", header=None, names=[input_db.value, output_db.value]
         )
@@ -442,3 +425,5 @@ if __name__ == "__main__":
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
     )
+
+    print(result)
