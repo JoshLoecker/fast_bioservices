@@ -1,3 +1,3 @@
-from fast_bioservices import fast_http
-from fast_bioservices.biodbnet import BioDBNet
-from fast_bioservices.nodes import Input, Output, Taxon
+from fast_bioservices.bigg.bigg import BiGG
+from fast_bioservices.biodbnet.biodbnet import BioDBNet
+from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
