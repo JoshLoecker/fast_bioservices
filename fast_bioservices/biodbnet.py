@@ -2,15 +2,17 @@ import concurrent.futures
 import functools
 import io
 import os
+import urllib.parse
 from typing import List, Literal, Union
 
 import modguard
 import pandas as pd
-from fast_http import HTTP
-from log import logger
-from nodes import Input, Output, Taxon
-from rich.progress import BarColumn, Progress, TimeRemainingColumn
-from utils import flatten
+from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
+
+from fast_bioservices.fast_http import HTTP
+from fast_bioservices.log import logger
+from fast_bioservices.nodes import Input, Output, Taxon
+from fast_bioservices.utils import flatten
 
 
 class BioDBNet:
@@ -57,9 +59,10 @@ class BioDBNet:
     def show_progress(self, value: bool) -> None:
         self._show_progress = value
 
-    def _execute_with_progress(self, url: str, progress_bar: Progress, task):
+    def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
         result = self._http.get_json(url)
         progress_bar.update(task, advance=1)
+
         return result
 
     def _execute(
@@ -68,7 +71,6 @@ class BioDBNet:
         as_dataframe: bool = True,
     ) -> Union[pd.DataFrame, List[dict]]:
         logger.debug(f"Collecting information for {len(urls)} sets of urls")
-
         self._http.warned = False
         if self._show_progress:
             with Progress(
@@ -235,13 +237,15 @@ class BioDBNet:
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self._url + "?method=db2db&format=row")
             urls[-1] += f"&input={input_db.value}"
-            urls[-1] += f"&outputs={output_db}"
+            urls[-1] += f"&outputs={output_db_value}"
             urls[-1] += (
                 f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             )
-            urls[-1] += f"&taxonId={taxon}"
-        df = self._execute(urls)
-        df.rename(columns={"InputValue": input_db.value}, inplace=True)  # type: ignore
+            urls[-1] += f"&taxonId={taxon_id}"
+            urls[-1] = urllib.parse.quote(urls[-1], safe=":/?&=")
+        df = pd.DataFrame(self._execute(urls))
+
+        df.rename(columns={"InputValue": input_db.value}, inplace=True)
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df  # type: ignore
 
@@ -432,10 +436,9 @@ class BioDBNet:
 if __name__ == "__main__":
     biodbnet = BioDBNet(cache=False, show_progress=True)
     result = biodbnet.db2db(
-        # input_values=["4318", "1376", "2576", "10089"],
-        input_values=[str(i) for i in range(10000)],
+        input_values=["4318", "1376", "2576", "10089"],
+        # input_values=[str(i) for i in range(10000)],
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
     )
-    print(result)
