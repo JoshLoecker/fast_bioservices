@@ -62,7 +62,6 @@ class BioDBNet:
     def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
         result = self._http.get_json(url)
         progress_bar.update(task, advance=1)
-        print(result)
 
         return result
 
@@ -72,9 +71,6 @@ class BioDBNet:
         as_dataframe: bool = True,
     ) -> Union[pd.DataFrame, List[dict]]:
         logger.debug(f"Collecting information for {len(urls)} sets of urls")
-
-        print(urls)
-
         self._http.warned = False
         if self._show_progress:
             with Progress(
