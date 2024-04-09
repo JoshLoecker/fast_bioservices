@@ -8,8 +8,9 @@ from typing import List, Optional, Union
 import httpx
 import httpx_cache
 import modguard
-from log import logger
-from settings import cache_name
+
+from fast_bioservices.log import logger
+from fast_bioservices.settings import cache_name
 
 
 class HTTP:

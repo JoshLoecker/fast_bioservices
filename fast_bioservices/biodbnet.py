@@ -6,11 +6,12 @@ from typing import List, Literal, Union
 
 import modguard
 import pandas as pd
-from fast_http import HTTP
-from log import logger
-from nodes import Input, Output, Taxon
 from rich.progress import BarColumn, Progress, TimeRemainingColumn
-from utils import flatten
+
+from fast_bioservices.fast_http import HTTP
+from fast_bioservices.log import logger
+from fast_bioservices.nodes import Input, Output, Taxon
+from fast_bioservices.utils import flatten
 
 
 class BioDBNet:
