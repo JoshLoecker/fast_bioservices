@@ -259,17 +259,6 @@ files = [
 ]
 
 [[package]]
-name = "modguard"
-version = "0.7.0"
-description = "A Python tool to maintain clean dependencies across python modules."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "modguard-0.7.0-py3-none-any.whl", hash = "sha256:da9175c72e2b8e3ba8d41443c0243372578f3ed99c4ffc7f785301c5b73a8a99"},
-    {file = "modguard-0.7.0.tar.gz", hash = "sha256:d8fd0c9fc7f45c83338d59183b2dd6d943734d736ecc4e789331eb75287dfc6d"},
-]
-
-[[package]]
 name = "msgpack"
 version = "1.0.8"
 description = "MessagePack serializer"
@@ -730,4 +719,4 @@ test = ["gevent (>=20.6.2)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<3.12"
-content-hash = "bc86d1de505c27617554ba8145f14ca879675de646efe4c810ce3631adad2195"
+content-hash = "e01144deb55af91a5edbfada63c563cfe71137969fce274f115476105b608ffa"
