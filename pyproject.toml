@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fast_bioservices"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Josh Loecker <joshloecker@icloud.com>"]
 readme = "README.md"
