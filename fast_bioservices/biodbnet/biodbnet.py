@@ -133,16 +133,17 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         taxon: Union[int, Taxon, List[Union[int, Taxon]]],
     ) -> Union[int, List[int]]:
-        taxon_list = [taxon] if isinstance(taxon, (int, Taxon)) else taxon
-        for t in taxon_list:
-            if isinstance(t, Taxon):
-                t = t.value
+        taxon_list = taxon if isinstance(taxon, list) else [taxon]
+        for i in range(len(taxon_list)):
+            if isinstance(taxon_list[i], Taxon):
+                taxon_list[i] = taxon_list[i].value
 
-            logger.debug(f"Validating taxon ID '{t}'")
-            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
+            logger.debug(f"Validating taxon ID '{taxon_list[i]}'")
+            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
             if "No items found." in self._get(taxon_url, temp_disable_cache=True).text:
-                raise ValueError(f"Unable to find taxon '{t}'")
+                raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
+        
         return taxon_list[0] if len(taxon_list) == 1 else taxon_list
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
