@@ -2,7 +2,7 @@ import logging
 
 from fast_bioservices import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("fast_bioservices")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(message)s",
