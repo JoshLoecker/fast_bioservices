@@ -9,7 +9,7 @@ from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import FastHTTP
+from fast_bioservices.fast_http import FastHTTP, Response
 from fast_bioservices.log import logger
 from fast_bioservices.utils import flatten
 
@@ -59,7 +59,7 @@ class BioDBNet(BaseModel, FastHTTP):
         self._show_progress = value
 
     def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
-        result = self._get(url).json()
+        result = self._get(url).json
         progress_bar.update(task, advance=1)
         return result
 
@@ -94,7 +94,7 @@ class BioDBNet(BaseModel, FastHTTP):
                 max_workers=self._max_workers
             ) as executor:
                 results = list(executor.map(self._get, urls))
-                results = [r.json() for r in results]
+                results = [r.json for r in results]
 
         if as_dataframe:
             results: list = flatten(results)
@@ -133,7 +133,7 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         taxon: Union[int, Taxon, List[Union[int, Taxon]]],
     ) -> Union[int, List[int]]:
-        taxon_list = taxon if isinstance(taxon, list) else [taxon]
+        taxon_list: list = taxon if isinstance(taxon, list) else [taxon]
         for i in range(len(taxon_list)):
             if isinstance(taxon_list[i], Taxon):
                 taxon_list[i] = taxon_list[i].value
@@ -148,17 +148,17 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        outputs = self._get(url, temp_disable_cache=True).json()
+        outputs = self._get(url, temp_disable_cache=True).json
         return outputs["output"]
 
     def getInputs(self) -> List[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self._get(url, temp_disable_cache=True).json()
+        inputs = self._get(url, temp_disable_cache=True).json
         return inputs["input"]
 
     def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs = self._get(url, temp_disable_cache=True).json()
+        valid_outputs = self._get(url, temp_disable_cache=True).json
         return valid_outputs["output"]
 
     def getAllPathways(
@@ -169,7 +169,7 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon_id = self._validate_taxon_id(taxon)
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
-        result = self._get(url).json()
+        result = self._get(url).json
         if as_dataframe:
             return pd.DataFrame(result)
         return result  # type: ignore
@@ -189,7 +189,7 @@ class BioDBNet(BaseModel, FastHTTP):
             pathways = [pathways]
 
         url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
-        result = self._get(url).json()
+        result = self._get(url).json
 
         if as_dataframe:
             return pd.DataFrame(result)
@@ -420,8 +420,8 @@ class BioDBNet(BaseModel, FastHTTP):
 if __name__ == "__main__":
     biodbnet = BioDBNet(cache=False, show_progress=True)
     result = biodbnet.db2db(
-        input_values=["4318", "1376", "2576", "10089"],
-        # input_values=[str(i) for i in range(10000)],
+        # input_values=["4318", "1376", "2576", "10089"],
+        input_values=[str(i) for i in range(1250)],
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,

@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Literal, Mapping, Optional, Union
+from typing import Any, Literal, Mapping, Optional
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.fast_http import FastHTTP
@@ -23,17 +23,17 @@ class BiGG(BaseModel, FastHTTP):
         return self._download_url
 
     def version(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
-        return self._get(f"{self.url}/database_version", temp_disable_cache).json()
+        return self._get(f"{self.url}/database_version", temp_disable_cache).json
 
     def models(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
-        return self._get(f"{self.url}/models", temp_disable_cache).json()
+        return self._get(f"{self.url}/models", temp_disable_cache).json
 
     def model_details(
         self,
         model_id: str,
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
-        return self._get(f"{self.url}/models/{model_id}", temp_disable_cache).json()
+        return self._get(f"{self.url}/models/{model_id}", temp_disable_cache).json
 
     def json(
         self,
@@ -43,7 +43,7 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/models/{model_id}/download",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def download(
         self,
@@ -63,10 +63,10 @@ class BiGG(BaseModel, FastHTTP):
         )
 
         if format == "json":
-            json.dump(response.json(), open(download_path, "w"), indent=2)
+            json.dump(response.json, open(download_path, "w"), indent=2)
         else:
             with open(download_path, "wb") as o_stream:
-                o_stream.write(response.content)
+                o_stream.write(response.bytes)
 
     def model_reactions(
         self,
@@ -76,7 +76,7 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/models/{model_id}/reactions",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def model_reaction_details(
         self,
@@ -87,7 +87,7 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/models/{model_id}/reactions/{reaction_id}",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def model_metabolites(
         self,
@@ -97,7 +97,7 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/models/{model_id}/metabolites",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def model_metabolite_details(
         self,
@@ -108,16 +108,14 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/models/{model_id}/metabolites/{metabolite_id}",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def model_genes(
         self,
         model_id: str,
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
-        return self._get(
-            f"{self.url}/models/{model_id}/genes", temp_disable_cache
-        ).json()
+        return self._get(f"{self.url}/models/{model_id}/genes", temp_disable_cache).json
 
     def model_gene_details(
         self,
@@ -128,12 +126,12 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/models/{model_id}/genes/{gene_id}",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def universal_reactions(
         self, temp_disable_cache: bool = False
     ) -> Mapping[Any, Any]:
-        return self._get(f"{self.url}/universal/reactions", temp_disable_cache).json()
+        return self._get(f"{self.url}/universal/reactions", temp_disable_cache).json
 
     def universal_reaction_details(
         self,
@@ -143,12 +141,12 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/universal/reactions/{reaction_id}",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def universal_metabolites(
         self, temp_disable_cache: bool = False
     ) -> Mapping[Any, Any]:
-        return self._get(f"{self.url}/universal/metabolites", temp_disable_cache).json()
+        return self._get(f"{self.url}/universal/metabolites", temp_disable_cache).json
 
     def universal_metabolite_details(
         self,
@@ -158,7 +156,7 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/universal/metabolites/{metabolite_id}",
             temp_disable_cache,
-        ).json()
+        ).json
 
     def search(
         self,
@@ -169,4 +167,4 @@ class BiGG(BaseModel, FastHTTP):
         return self._get(
             f"{self.url}/search?query={query}&search_type={search_type}",
             temp_disable_cache,
-        ).json()
+        ).json
