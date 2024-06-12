@@ -9,7 +9,7 @@ from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import FastHTTP, Response
+from fast_bioservices.fast_http import FastHTTP
 from fast_bioservices.log import logger
 from fast_bioservices.utils import flatten
 
@@ -218,10 +218,8 @@ class BioDBNet(BaseModel, FastHTTP):
             output_db_value = output_db.value
         else:
             output_db_value = ",".join([o.value for o in output_db])
-        logger.debug(f"Got an input database with a value of '{input_db}'")
-        logger.debug(
-            f"Got {len(output_db_value.split(','))} output databases with values of: {output_db}"
-        )
+        logger.debug(f"Got an input database with a value of '{input_db.value}'")
+        logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
@@ -426,5 +424,3 @@ if __name__ == "__main__":
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
     )
-
-    print(result)
