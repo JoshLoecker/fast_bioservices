@@ -43,9 +43,7 @@ class BioDBNet(BaseModel, FastHTTP):
             logger.debug("`max_workers` must be greater than 0, setting to 1")
             value = 1
         elif value > self._worker_limit:
-            logger.debug(
-                f"`max_workers` must be less than 10 (received {value}), setting to 10"
-            )
+            logger.debug(f"`max_workers` must be less than 10 (received {value}), setting to 10")
             value = 10
 
         self._max_workers = value
@@ -79,20 +77,14 @@ class BioDBNet(BaseModel, FastHTTP):
                 TimeRemainingColumn(),
             ) as progress:
                 task = progress.add_task("[cyan]Converting...", total=len(urls))
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self._max_workers
-                ) as executor:
-                    partial = functools.partial(
-                        self._execute_with_progress, progress_bar=progress, task=task
-                    )
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
+                    partial = functools.partial(self._execute_with_progress, progress_bar=progress, task=task)
 
                     results = list(executor.map(partial, urls))
                 # Update the description
                 progress.update(task, description="Converting... Done!")
         else:
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=self._max_workers
-            ) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
                 results = list(executor.map(self._get, urls))
                 results = [r.json for r in results]
 
@@ -124,9 +116,7 @@ class BioDBNet(BaseModel, FastHTTP):
             output_list = output
 
         if direct_output:
-            return all(
-                [o.value in self.getDirectOutputsForInput(input_) for o in output_list]
-            )
+            return all([o.value in self.getDirectOutputsForInput(input_) for o in output_list])
         return all([o.value in self.getOutputsForInput(input_) for o in output_list])
 
     def _validate_taxon_id(
@@ -143,7 +133,7 @@ class BioDBNet(BaseModel, FastHTTP):
             if "No items found." in self._get(taxon_url, temp_disable_cache=True).text:
                 raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
-        
+
         return taxon_list[0] if len(taxon_list) == 1 else taxon_list
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
@@ -226,9 +216,7 @@ class BioDBNet(BaseModel, FastHTTP):
             urls.append(self.url + "?method=db2db&format=row")
             urls[-1] += f"&input={input_db.value}"
             urls[-1] += f"&outputs={output_db_value}"
-            urls[-1] += (
-                f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
-            )
+            urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
             urls[-1] = urllib.parse.quote(urls[-1], safe=":/?&=")
         df = pd.DataFrame(self._execute(urls))
@@ -302,9 +290,7 @@ class BioDBNet(BaseModel, FastHTTP):
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
                 urls.append(self.url + "?method=dbfind&format=row")
-                urls[-1] += (
-                    f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
-                )
+                urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
                 urls[-1] += f"&output={out_db.value}"
                 urls[-1] += f"&taxonId={taxon_id}"
 
@@ -340,9 +326,7 @@ class BioDBNet(BaseModel, FastHTTP):
             for i in range(0, len(input_values), self._chunk_size):
                 urls.append(self.url + "?method=dbortho")
                 urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
-                urls[-1] += (
-                    f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
-                )
+                urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
                 urls[-1] += f"&inputTaxon={input_taxon_value}"
                 urls[-1] += f"&outputTaxon={output_taxon_value}"
                 urls[-1] += f"&output={out_db.value.replace(' ', '').lower()}"
@@ -352,9 +336,7 @@ class BioDBNet(BaseModel, FastHTTP):
         master_df: pd.DataFrame = pd.DataFrame(json_results[0])
         for i, result in enumerate(json_results):
             df = pd.DataFrame(result)
-            master_df = pd.merge(
-                master_df, df, on=["InputValue"], how="inner", validate="one_to_one"
-            )
+            master_df = pd.merge(master_df, df, on=["InputValue"], how="inner", validate="one_to_one")
 
         # Remove potential duplicate columns
         for column in master_df.columns:
@@ -410,9 +392,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
         buffer = io.StringIO(self._get(url).text)
-        return pd.read_csv(
-            buffer, sep="\t", header=None, names=[input_db.value, output_db.value]
-        )
+        return pd.read_csv(buffer, sep="\t", header=None, names=[input_db.value, output_db.value])
 
 
 if __name__ == "__main__":
