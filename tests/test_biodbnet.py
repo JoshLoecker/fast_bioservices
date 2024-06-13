@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 
