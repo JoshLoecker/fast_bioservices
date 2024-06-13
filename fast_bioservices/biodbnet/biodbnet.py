@@ -2,7 +2,7 @@ import concurrent.futures
 import functools
 import io
 import urllib.parse
-from typing import List, Literal, Union
+from typing import Dict, List, Literal, Union
 
 import pandas as pd
 from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
@@ -165,7 +165,7 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         taxon: Union[Taxon, int],
         as_dataframe: bool = False,
-    ) -> Union[pd.DataFrame, List[dict[str, str]]]:
+    ) -> Union[pd.DataFrame, List[Dict[str, str]]]:
         taxon_id = self._validate_taxon_id(taxon)
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
@@ -182,7 +182,7 @@ class BioDBNet(BaseModel, FastHTTP):
         ],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
         as_dataframe: bool = True,
-    ) -> Union[pd.DataFrame, List[dict[str, str]]]:
+    ) -> Union[pd.DataFrame, List[Dict[str, str]]]:
         taxon_id = self._validate_taxon_id(taxon)
 
         if isinstance(pathways, str):
@@ -199,7 +199,7 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         input_values: List[str],
         input_db: Input,
-        output_db: Union[Output, list[Output]],
+        output_db: Union[Output, List[Output]],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)
@@ -323,7 +323,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def dbOrtho(
         self,
-        input_values: list[str],
+        input_values: List[str],
         input_db: Input,
         output_db: Union[Output, List[Output]],
         input_taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
