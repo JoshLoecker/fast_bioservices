@@ -5,7 +5,6 @@ build-backend = "hatchling.build"
 [project]
 name = "fast_bioservices"
 dynamic = ["version"]
-# version = "0.1.1"
 description = "A fast way to access and convert biological information"
 authors = [{ name = "Josh Loecker", email = "joshloecker@gmail.com" }]
 readme = "README.md"
@@ -18,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = ["appdirs~=1.4", "pandas>=1.5.8,<3", "rich~=13.7"]
+path = "src"
 
 [project.urls]
 Documentation = "https://github.com/JoshLoecker/fast_bioservices"
@@ -25,12 +25,18 @@ Issues = "https://github.com/JoshLoecker/fast_bioservices/issues"
 Source = "https://github.com/JoshLoecker/fast_bioservices"
 
 [tool.hatch.version]
-path = "fast_bioservices/__about__.py"
+path = "src/fast_bioservices/__about__.py"
 
+[tool.hatch.envs.default]
+paths = "src"
 
 [[tool.hatch.envs.hatch-test.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 dependencies = ["pytest~=8.2", "pytest-xdist~=3.6", "yappi~=1.6"]
+
+[tool.hatch.metadata.hook.hatchling]
+[tool.hatch.metadata.hook.hatchling.sources]
+include = ["src"]
 
 [tool.ruff]
 line-length = 120
