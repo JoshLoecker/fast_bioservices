@@ -17,12 +17,15 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = ["appdirs~=1.4", "pandas>=1.5.8,<3", "rich~=13.7"]
-path = "src"
 
 [project.urls]
 Documentation = "https://github.com/JoshLoecker/fast_bioservices"
 Issues = "https://github.com/JoshLoecker/fast_bioservices/issues"
 Source = "https://github.com/JoshLoecker/fast_bioservices"
+
+[tool.rye]
+managed = true
+dev-dependencies = ["pytest>=8.2.2", "yappi>=1.6.0"]
 
 [tool.hatch.version]
 path = "src/fast_bioservices/__init__.py"
