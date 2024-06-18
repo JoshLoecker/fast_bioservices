@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 
@@ -79,9 +78,7 @@ def test_dbWalk(biodbnet_instance):
 
 @pytest.mark.skip(reason="dbReport not yet implemented")
 def test_dbReport(biodbnet_instance):
-    result = biodbnet_instance.dbReport(
-        input_values=["4318"], input_db=Input.GENE_ID, taxon=Taxon.HOMO_SAPIENS
-    )
+    biodbnet_instance.dbReport(input_values=["4318"], input_db=Input.GENE_ID, taxon=Taxon.HOMO_SAPIENS)
 
 
 def test_dbFind(biodbnet_instance, gene_ids, gene_symbols):

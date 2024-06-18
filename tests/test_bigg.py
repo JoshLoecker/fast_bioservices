@@ -1,9 +1,7 @@
 import os
 
-import pandas as pd
 import pytest
-
-from fast_bioservices import BiGG, BioDBNet, Input, Output, Taxon
+from fast_bioservices import BiGG
 
 
 # Make bigg_instance exist for the lifetime of the tests
