@@ -10,8 +10,10 @@ class BiGG(BaseModel, FastHTTP):
     _download_url: str = "http://bigg.ucsd.edu/static/models"
 
     def __init__(self, cache: bool = True, show_progress: bool = True):
+        self._max_workers: int = 10
+
         # Initialize parent classes
-        BaseModel.__init__(self, show_progress=show_progress)
+        BaseModel.__init__(self, show_progress=show_progress, max_workers=self._max_workers)
         FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
 
     @property

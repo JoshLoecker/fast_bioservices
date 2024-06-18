@@ -1,17 +1,13 @@
-import concurrent.futures
-import functools
 import io
 import urllib.parse
 from typing import Dict, List, Literal, Union
 
 import pandas as pd
-from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
 from fast_bioservices.fast_http import FastHTTP
 from fast_bioservices.log import logger
-from fast_bioservices.utils import flatten
 
 
 class BioDBNet(BaseModel, FastHTTP):
@@ -22,12 +18,12 @@ class BioDBNet(BaseModel, FastHTTP):
         show_progress: bool = True,
         cache: bool = True,
     ):
-        # Initialize parent classes
-        BaseModel.__init__(self, show_progress=show_progress)
-        FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
-
         self._chunk_size: int = 250
-        self._worker_limit: int = 10
+        self._max_workers: int = 10
+
+        # Initialize parent classes
+        BaseModel.__init__(self, show_progress=show_progress, max_workers=self._max_workers)
+        FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
 
     @property
     def url(self) -> str:
@@ -42,7 +38,7 @@ class BioDBNet(BaseModel, FastHTTP):
         if value < 1:
             logger.debug("`max_workers` must be greater than 0, setting to 1")
             value = 1
-        elif value > self._worker_limit:
+        elif value > self._max_workers:
             logger.debug(f"`max_workers` must be less than 10 (received {value}), setting to 10")
             value = 10
 
@@ -56,42 +52,41 @@ class BioDBNet(BaseModel, FastHTTP):
     def show_progress(self, value: bool) -> None:
         self._show_progress = value
 
-    def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
-        result = self._get(url).json
-        progress_bar.update(task, advance=1)
-        return result
+    # def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
+    #     result = self._get(url).json
+    #     progress_bar.update(task, advance=1)
+    #     return result
 
-    def _execute(
-        self,
-        urls: List[str],
-        as_dataframe: bool = True,
-    ) -> Union[pd.DataFrame, List[dict]]:
-        logger.debug(f"Collecting information for {len(urls)} sets of urls")
-        self.warned = False
-        if self._show_progress:
-            with Progress(
-                "[progress.description]{task.description}",
-                BarColumn(),
-                "{task.completed}/{task.total} batches",
-                "[progress.percentage]{task.percentage:>3.0f}%",
-                TimeRemainingColumn(),
-            ) as progress:
-                task = progress.add_task("[cyan]Converting...", total=len(urls))
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-                    partial = functools.partial(self._execute_with_progress, progress_bar=progress, task=task)
-
-                    results = list(executor.map(partial, urls))
-                # Update the description
-                progress.update(task, description="Converting... Done!")
-        else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-                results = list(executor.map(self._get, urls))
-                results = [r.json for r in results]
-
-        if as_dataframe:
-            results: list = flatten(results)
-            return pd.DataFrame(results)
-        return results
+    # def _execute(
+    #     self,
+    #     urls: List[str],
+    #     as_dataframe: bool = True,
+    # ) -> Union[pd.DataFrame, List[dict]]:
+    #     logger.debug(f"Collecting information for {len(urls)} sets of urls")
+    #     if self._show_progress:
+    #         with Progress(
+    #             "[progress.description]{task.description}",
+    #             BarColumn(),
+    #             "{task.completed}/{task.total} batches",
+    #             "[progress.percentage]{task.percentage:>3.0f}%",
+    #             TimeRemainingColumn(),
+    #         ) as progress:
+    #             task = progress.add_task("[cyan]Converting...", total=len(urls))
+    #             with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
+    #                 partial = functools.partial(self._execute_with_progress, progress_bar=progress, task=task)
+    #
+    #                 results = list(executor.map(partial, urls))
+    #             # Update the description
+    #             progress.update(task, description="Converting... Done!")
+    #     else:
+    #         with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
+    #             results = list(executor.map(self._get, urls))
+    #             results = [r.json for r in results]
+    #
+    #     if as_dataframe:
+    #         results: list = flatten(results)
+    #         return pd.DataFrame(results)
+    #     return results
 
     def _are_nodes_valid(
         self,
@@ -219,7 +214,7 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
             urls[-1] = urllib.parse.quote(urls[-1], safe=":/?&=")
-        df = pd.DataFrame(self._execute(urls))
+        df = pd.DataFrame(self._execute(func=self._get, data=urls))
 
         df.rename(columns={"InputValue": input_db.value}, inplace=True)
         logger.debug(f"Returning dataframe with {len(df)} rows")
@@ -294,7 +289,7 @@ class BioDBNet(BaseModel, FastHTTP):
                 urls[-1] += f"&output={out_db.value}"
                 urls[-1] += f"&taxonId={taxon_id}"
 
-        json_result = self._execute(urls, as_dataframe=False)
+        json_result = self._execute(func=self._get, data=urls)
         master_df: pd.DataFrame = pd.DataFrame(json_result[0])
         for result in json_result[1:]:
             df = pd.DataFrame(result)  # type: ignore
@@ -332,7 +327,7 @@ class BioDBNet(BaseModel, FastHTTP):
                 urls[-1] += f"&output={out_db.value.replace(' ', '').lower()}"
                 urls[-1] += "&format=row"
 
-        json_results: List[dict] = self._execute(urls, as_dataframe=False)  # type: ignore
+        json_results: List[dict] = self._execute(func=self._get, data=urls)
         master_df: pd.DataFrame = pd.DataFrame(json_results[0])
         for i, result in enumerate(json_results):
             df = pd.DataFrame(result)
@@ -375,7 +370,7 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&annotations={','.join(annotations_)}"
             urls[-1] += "&format=row"
 
-        df = pd.DataFrame(self._execute(urls))
+        df = pd.DataFrame(self._execute(func=self._get, data=urls))
         df = df.rename(columns={"InputValue": "Input Value"})
         return df
 
