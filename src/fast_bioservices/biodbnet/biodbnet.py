@@ -3,9 +3,9 @@ from typing import Dict, List, Literal, Union
 
 import pandas as pd
 
+from fast_bioservices._fast_http import FastHTTP, Response
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import FastHTTP, Response
 from fast_bioservices.log import logger
 
 
@@ -40,19 +40,24 @@ class BioDBNet(BaseModel, FastHTTP):
     ) -> bool:
         """
         The input database and output database must be different.
-        :param input_: The input database.
-        :type input_: Input
-        :param output: The output database.
-        :type output: Union[Output, list[Output]]
-        :return: True if the input and output databases are different, False otherwise.
-        :rtype: bool
+
+        Parameters
+        ----------
+        input_ : Union[Input, Output]
+            The input database
+        output : Union[Input, Output, List[Input], List[Output]]
+            The output database
+        direct_output : bool, optional
+            Get direct output node(s) for a given input node (i.e., outputs reacable by a single connection), by default False
+
+        Returns
+        -------
+        bool
+            True if the input and output databases are different, False otherwise.
         """
 
         logger.debug("Validating databases")
-        if not isinstance(output, list):
-            output_list = [output]
-        else:
-            output_list = output
+        output_list = [output] if not isinstance(output, list) else output
 
         if direct_output:
             return all([o.value in self.getDirectOutputsForInput(input_) for o in output_list])
@@ -132,7 +137,6 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)
-
         if not self._are_nodes_valid(input_db, output_db):
             out_db = [output_db] if not isinstance(output_db, list) else output_db
             raise ValueError(
