@@ -1,8 +1,8 @@
 import json
 from typing import Any, Literal, Mapping, Optional
 
+from fast_bioservices._fast_http import FastHTTP
 from fast_bioservices.base import BaseModel
-from fast_bioservices.fast_http import FastHTTP
 
 
 class BiGG(BaseModel, FastHTTP):
