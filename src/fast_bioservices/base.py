@@ -1,44 +1,27 @@
-import concurrent.futures
-import functools
-from abc import ABC, abstractmethod
-from typing import Callable, Sequence
-
-from rich.progress import BarColumn, Progress, TaskID, TimeRemainingColumn
+from abc import ABC
 
 from fast_bioservices.log import logger
 
 
 class BaseModel(ABC):
-    def __init__(self, max_workers: int, show_progress: bool):
-        self._max_workers: int = max_workers
-        self._show_progress: bool = show_progress
+    def __init__(self, url: str):
+        self._url: str = url
 
     @property
-    @abstractmethod
-    def url(self) -> str: ...
+    def url(self) -> str:
+        return self._url
 
-    def _execute(self, func: Callable, data: Sequence):
-        def with_progress(func: Callable, url: str, progress_bar: Progress, task: TaskID):
-            result = func(url).json
-            progress_bar.update(task, advance=1)
-            return result
+    @property
+    def max_workers(self) -> int:
+        return self._max_workers
 
-        if self._show_progress:
-            with Progress(
-                "[progress.description]{task.description}",
-                BarColumn(),
-                "{task.completed}/{task.total} batches",
-                "[progress.percentage]{task.percentage:>3.0f}%",
-                TimeRemainingColumn(),
-            ) as progress:
-                task = progress.add_task("[cyan]Working...", total=len(data))
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-                    partial = functools.partial(with_progress, func=func, progress_bar=progress, task=task)
-                    results = list(executor.map(partial, data))
-                progress.update(task, description="[cyan]Working... Done!")
-        else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-                results = list(executor.map(func, data))
-                results = [r.json for r in results]
+    @max_workers.setter
+    def max_workers(self, value: int) -> None:
+        if value < 1:
+            logger.debug("`max_workers` must be greater than 0, setting to 1")
+            value = 1
+        elif value > self._max_workers:
+            logger.debug(f"`max_workers` must be less than 10 (received {value}), setting to 10")
+            value = 10
 
-        return results
+        self._max_workers = value

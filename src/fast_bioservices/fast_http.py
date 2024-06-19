@@ -1,16 +1,19 @@
 import hashlib
 import json
+import lzma
 import pickle
-import time
 import urllib
 import urllib.error
 import urllib.parse
 import urllib.request
 import urllib.response
 from abc import ABC
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from http.client import HTTPResponse
 from pathlib import Path
-from typing import Literal, Optional, Type, TypeVar, overload
+from typing import List, Literal, Optional, Type, TypeVar, Union, overload
+
+from rich.progress import BarColumn, Progress, TimeRemainingColumn
 
 from fast_bioservices.log import logger
 from fast_bioservices.settings import cache_dir
@@ -29,7 +32,16 @@ class Response:
         self._headers: dict
         self._debug_level: int
         self._content: bytes
+        self._status: int
         self._method: Method
+
+    @property
+    def url(self) -> str:
+        return self._url
+
+    @property
+    def headers(self) -> dict:
+        return self._headers
 
     @property
     def bytes(self) -> bytes:
@@ -43,12 +55,13 @@ class Response:
     def json(self) -> dict:
         return json.loads(self.text)
 
-    def to_cache(self) -> dict:
+    def cache_object(self) -> dict:
         return {
             "url": self._url,
             "headers": self._headers,
             "debug_level": self._debug_level,
             "content": self._content,
+            "status": self._status,
             "method": self._method,
         }
 
@@ -67,7 +80,7 @@ class Response:
         elif data is not None:
             return cls._from_cache(data)
         else:
-            raise ValueError("Either `response` and `method` or `data` must be provided")
+            raise ValueError("Either (`response` and `method`) or (`data`) must be provided")
 
     @classmethod
     def _from_response(cls, response: HTTPResponse, method: Method) -> "Response":
@@ -76,10 +89,11 @@ class Response:
         instance = cls()
         delattr(cls, "_from_class_method")
 
-        instance._url = response.url
+        instance._url = response.geturl()
         instance._headers = dict(response.getheaders())
         instance._debug_level = response.debuglevel
         instance._content = response.read()
+        instance._status = response.getcode()
         instance._method = method
         return instance
 
@@ -98,66 +112,101 @@ class Response:
         return instance
 
 class FastHTTP(ABC):
-    _cache: Optional[bool] = None
-
     def __init__(
         self,
         cache: bool,
-        max_requests_per_second: Optional[int] = None,
+        max_workers: int,
+        show_progress: bool,
+        max_requests_per_second: Optional[int],
     ) -> None:
         self._use_cache: bool = cache
-        self._cache_dirpath: Path = cache_dir
+        self._max_workers: int = max_workers
+        self._show_progress: bool = show_progress
+        self._max_requests_per_second: int = int(1e10) if max_requests_per_second is None else max_requests_per_second
 
+        self._cache_dirpath: Path = cache_dir
         self._requests_made: int = 0
         self._last_request_time: float = 0
-        self._max_requests_per_second: int = int(1e10)
-        if max_requests_per_second is not None:
-            self._max_requests_per_second = max_requests_per_second
 
-    def _get_without_cache(self, url: str) -> Response:
-        return Response.create(urllib.request.urlopen(url), method="GET")
+        self._thread_pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._progress = Progress(
+            "[progress.description]{task.description}",
+            BarColumn(),
+            "{task.completed}/{task.total} batches",
+            "[progress.percentage]{task.percentage:>3.0f}%",
+            TimeRemainingColumn(),
+        )
 
-    def _get_from_cache(self, url: str, cache_file: Path) -> Optional[Response]:
+    def __del__(self):
+        self._thread_pool.shutdown(wait=True)
+
+    @property
+    def show_progress(self) -> bool:
+        return self._show_progress
+
+    @show_progress.setter
+    def show_progress(self, value: bool) -> None:
+        self._show_progress = value
+
+    def _make_safe_url(self, urls: Union[str, List[str]]) -> List[str]:
+        # Safe characters from https://stackoverflow.com/questions/695438
+        safe = "&$+,/:;=?@#"
+        if isinstance(urls, str):
+            return [urllib.parse.quote(urls, safe=safe)]
+        return [urllib.parse.quote(url, safe=safe) for url in urls]
+
+    def _calculate_cache_key(self, url: str) -> Path:
+        cache_key = hashlib.md5(url.encode()).hexdigest()
+        cache_file = Path(self._cache_dirpath, cache_key)
+        return cache_file
+
+    def __get_without_cache(self, url: str, headers: dict) -> Response:
+        request = urllib.request.Request(url, headers=headers)
+        response: HTTPResponse = urllib.request.urlopen(request)
+        return Response.create(response=response, method="GET")
+
+    def __get_from_cache(self, url: str, headers: dict) -> Optional[Response]:
+        cache_file = self._calculate_cache_key(url)
         if cache_file.exists():
             logger.debug(f"Cache hit: {url}")
-            return Response.create(data=pickle.load(cache_file.open("rb")))
+            with lzma.open(cache_file, "rb") as cache_file:
+                return Response.create(data=pickle.load(cache_file))
         return None
 
-    def _save_to_cache(self, response: Response, cache_file: Path) -> None:
-        pickle.dump(response.to_cache(), cache_file.open("wb"))
+    def _save_to_cache(self, response: Response) -> None:
+        cache_filepath = self._calculate_cache_key(response.url)
+        with lzma.open(cache_filepath, "wb") as cache_file:
+            pickle.dump(response.cache_object(), cache_file)
 
     def _get(
         self,
-        url: str,
+        urls: Union[str, List[str]],
+        headers: Optional[dict] = None,
         temp_disable_cache: bool = False,
-    ) -> Response:
-        url = urllib.parse.quote(url, safe="%/:=&?~#+!$,;'@()*[]")
-        parts = urllib.parse.urlparse(url)
+    ) -> List[Response]:
+        headers = headers or {}
+        urls = self._make_safe_url(urls)
+        task = self._progress.add_task("[cyan]Working...", total=len(urls)) if self._progress else None
+        callable = self.__get_from_cache if self._use_cache and not temp_disable_cache else self.__get_without_cache
 
-        logger.debug(f"Getting {url}")
+        responses: List[Response] = []
+        futures: List[Future[Union[Response, None]]] = [
+            self._thread_pool.submit(callable, url, headers) for (url, headers) in zip(urls, [headers] * len(urls))
+        ]
 
-        # Perform rate limiting
-        time_since_last_request = time.time() - self._last_request_time
-        if time_since_last_request < 1 / self._max_requests_per_second:
-            time.sleep(1 / self._max_requests_per_second - time_since_last_request)
-        self._last_request_time = time.time()
-
-        cache_key = hashlib.blake2b(url.encode()).hexdigest()
-        cache_file = Path(self._cache_dirpath, cache_key)
-        try:
-            if self._use_cache and not temp_disable_cache:
-                response = self._get_from_cache(url, cache_file)
-                if response is None:
-                    response = self._get_without_cache(url)
-                    self._save_to_cache(response, cache_file)
+        for url, future in zip(urls, as_completed(futures)):
+            response = future.result()
+            if response is not None:
+                responses.append(response)
             else:
-                response = self._get_without_cache(url)
-        except urllib.error.URLError as e:
-            logger.error(f"Could not connect to {parts.netloc + parts.path}")
-            raise e
+                responses.append(self.__get_without_cache(url, headers))
+                if self._use_cache:
+                    self._save_to_cache(responses[-1])
+            if self._progress and task is not None:
+                self._progress.update(task, advance=1)
 
-        return response
+        return responses
 
 
 if __name__ == "__main__":
-    http = FastHTTP(cache=True)
+    http = FastHTTP(cache=True, max_workers=2, show_progress=True, max_requests_per_second=10)

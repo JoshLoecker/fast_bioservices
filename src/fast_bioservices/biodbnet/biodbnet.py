@@ -1,92 +1,36 @@
 import io
-import urllib.parse
 from typing import Dict, List, Literal, Union
 
 import pandas as pd
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import FastHTTP
+from fast_bioservices.fast_http import FastHTTP, Response
 from fast_bioservices.log import logger
 
 
 class BioDBNet(BaseModel, FastHTTP):
-    _url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
-
     def __init__(
         self,
         show_progress: bool = True,
         cache: bool = True,
     ):
+        self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
         self._chunk_size: int = 250
         self._max_workers: int = 10
 
-        # Initialize parent classes
-        BaseModel.__init__(self, show_progress=show_progress, max_workers=self._max_workers)
-        FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
+        BaseModel.__init__(self, url=self._url)
+        FastHTTP.__init__(
+            self,
+            cache=cache,
+            max_workers=self._max_workers,
+            max_requests_per_second=10,
+            show_progress=show_progress,
+        )
 
     @property
     def url(self) -> str:
         return self._url
-
-    @property
-    def max_workers(self) -> int:
-        return self._max_workers
-
-    @max_workers.setter
-    def max_workers(self, value: int) -> None:
-        if value < 1:
-            logger.debug("`max_workers` must be greater than 0, setting to 1")
-            value = 1
-        elif value > self._max_workers:
-            logger.debug(f"`max_workers` must be less than 10 (received {value}), setting to 10")
-            value = 10
-
-        self._max_workers = value
-
-    @property
-    def show_progress(self) -> bool:
-        return self._show_progress
-
-    @show_progress.setter
-    def show_progress(self, value: bool) -> None:
-        self._show_progress = value
-
-    # def _execute_with_progress(self, url: str, progress_bar: Progress, task: TaskID):
-    #     result = self._get(url).json
-    #     progress_bar.update(task, advance=1)
-    #     return result
-
-    # def _execute(
-    #     self,
-    #     urls: List[str],
-    #     as_dataframe: bool = True,
-    # ) -> Union[pd.DataFrame, List[dict]]:
-    #     logger.debug(f"Collecting information for {len(urls)} sets of urls")
-    #     if self._show_progress:
-    #         with Progress(
-    #             "[progress.description]{task.description}",
-    #             BarColumn(),
-    #             "{task.completed}/{task.total} batches",
-    #             "[progress.percentage]{task.percentage:>3.0f}%",
-    #             TimeRemainingColumn(),
-    #         ) as progress:
-    #             task = progress.add_task("[cyan]Converting...", total=len(urls))
-    #             with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-    #                 partial = functools.partial(self._execute_with_progress, progress_bar=progress, task=task)
-    #
-    #                 results = list(executor.map(partial, urls))
-    #             # Update the description
-    #             progress.update(task, description="Converting... Done!")
-    #     else:
-    #         with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-    #             results = list(executor.map(self._get, urls))
-    #             results = [r.json for r in results]
-    #
-    #     if as_dataframe:
-    #         results: list = flatten(results)
-    #         return pd.DataFrame(results)
-    #     return results
 
     def _are_nodes_valid(
         self,
@@ -125,7 +69,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
             logger.debug(f"Validating taxon ID '{taxon_list[i]}'")
             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
-            if "No items found." in self._get(taxon_url, temp_disable_cache=True).text:
+            if "No items found." in self._get(taxon_url, temp_disable_cache=True)[0].text:
                 raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
 
@@ -133,17 +77,17 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        outputs = self._get(url, temp_disable_cache=True).json
+        outputs = self._get(url, temp_disable_cache=True)[0].json
         return outputs["output"]
 
     def getInputs(self) -> List[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self._get(url, temp_disable_cache=True).json
+        inputs = self._get(url, temp_disable_cache=True)[0].json
         return inputs["input"]
 
     def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs = self._get(url, temp_disable_cache=True).json
+        valid_outputs = self._get(url, temp_disable_cache=True)[0].json
         return valid_outputs["output"]
 
     def getAllPathways(
@@ -154,7 +98,7 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon_id = self._validate_taxon_id(taxon)
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
-        result = self._get(url).json
+        result = self._get(url)[0].json
         if as_dataframe:
             return pd.DataFrame(result)
         return result  # type: ignore
@@ -174,7 +118,7 @@ class BioDBNet(BaseModel, FastHTTP):
             pathways = [pathways]
 
         url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
-        result = self._get(url).json
+        result = self._get(url)[0].json
 
         if as_dataframe:
             return pd.DataFrame(result)
@@ -213,12 +157,15 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&outputs={output_db_value}"
             urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
-            urls[-1] = urllib.parse.quote(urls[-1], safe=":/?&=")
-        df = pd.DataFrame(self._execute(func=self._get, data=urls))
+
+        responses: List[Response] = self._get(urls=urls)
+        df = pd.DataFrame()
+        for response in responses:
+            df = pd.concat([df, pd.DataFrame(response.json)])
 
         df.rename(columns={"InputValue": input_db.value}, inplace=True)
         logger.debug(f"Returning dataframe with {len(df)} rows")
-        return df  # type: ignore
+        return df
 
     def dbWalk(
         self,
@@ -247,8 +194,11 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&dbPath={'->'.join(databases)}"
             urls[-1] += f"&taxonId={taxon_id}"
 
-        df = self._execute(urls)  # type: ignore
-        df = df.rename(columns={"InputValue": str(db_path[0].value)})  # type: ignore
+        responses: List[Response] = self._get(urls)
+        df = pd.DataFrame()
+        for response in responses:
+            df = pd.concat([df, pd.DataFrame(response.json)])
+        df = df.rename(columns={"InputValue": str(db_path[0].value)})
 
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df
@@ -289,18 +239,11 @@ class BioDBNet(BaseModel, FastHTTP):
                 urls[-1] += f"&output={out_db.value}"
                 urls[-1] += f"&taxonId={taxon_id}"
 
-        json_result = self._execute(func=self._get, data=urls)
-        master_df: pd.DataFrame = pd.DataFrame(json_result[0])
-        for result in json_result[1:]:
-            df = pd.DataFrame(result)  # type: ignore
-            master_df = pd.merge(
-                master_df,
-                df,
-                on=["InputValue", "Input Type"],
-                how="inner",
-                validate="one_to_one",
-            )
-        return master_df
+        responses: List[Response] = self._get(urls=urls)
+        df = pd.DataFrame()
+        for response in responses:
+            df = pd.concat([df, pd.DataFrame(response.json)])
+        return df
 
     def dbOrtho(
         self,
@@ -327,22 +270,21 @@ class BioDBNet(BaseModel, FastHTTP):
                 urls[-1] += f"&output={out_db.value.replace(' ', '').lower()}"
                 urls[-1] += "&format=row"
 
-        json_results: List[dict] = self._execute(func=self._get, data=urls)
-        master_df: pd.DataFrame = pd.DataFrame(json_results[0])
-        for i, result in enumerate(json_results):
-            df = pd.DataFrame(result)
-            master_df = pd.merge(master_df, df, on=["InputValue"], how="inner", validate="one_to_one")
+        responses: List[Response] = self._get(urls=urls)
+        df = pd.DataFrame()
+        for response in responses:
+            df = pd.concat([df, pd.DataFrame(response.json)])
 
         # Remove potential duplicate columns
-        for column in master_df.columns:
+        for column in df.columns:
             if str(column).endswith("_x"):
-                master_df = master_df.drop(column, axis=1)
+                df = df.drop(column, axis=1)
             elif str(column).endswith("_y"):
-                master_df.rename(columns={column: column[:-2]}, inplace=True)
+                df.rename(columns={column: column[:-2]}, inplace=True)
 
-        master_df.rename(columns={"InputValue": input_db.value}, inplace=True)
+        df.rename(columns={"InputValue": input_db.value}, inplace=True)
 
-        return master_df
+        return df
 
     def dbAnnot(
         self,
@@ -370,7 +312,10 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&annotations={','.join(annotations_)}"
             urls[-1] += "&format=row"
 
-        df = pd.DataFrame(self._execute(func=self._get, data=urls))
+        responses: list[Response] = self._get(urls=urls)
+        df = pd.DataFrame()
+        for response in responses:
+            df = pd.concat([df, pd.DataFrame(response.json)])
         df = df.rename(columns={"InputValue": "Input Value"})
         return df
 
@@ -386,16 +331,18 @@ class BioDBNet(BaseModel, FastHTTP):
         output_db_val = output_db.value.replace(" ", "_")
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
-        buffer = io.StringIO(self._get(url).text)
+        buffer = io.StringIO(self._get(url)[0].text)
         return pd.read_csv(buffer, sep="\t", header=None, names=[input_db.value, output_db.value])
 
 
 if __name__ == "__main__":
-    biodbnet = BioDBNet(cache=False, show_progress=True)
+    biodbnet = BioDBNet(cache=True, show_progress=True)
     result = biodbnet.db2db(
-        # input_values=["4318", "1376", "2576", "10089"],
-        input_values=[str(i) for i in range(1250)],
+        input_values=["4318", "1376", "2576", "10089"],
+        # input_values=[str(i) for i in range(1250)],
+        # annotations=["Genes"],
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
     )
+    print(result)
