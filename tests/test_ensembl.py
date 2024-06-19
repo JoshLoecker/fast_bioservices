@@ -59,7 +59,7 @@ def test_by_species_with_symbol_or_id_returns_homology_results(mock_get, get_hom
     mock_get.return_value = [type("obj", (object,), {"json": mock_response})]
     results = get_homology_instance.by_species_with_symbol_or_id(
         reference_species="human",
-        ensembl_id_or_species="ENSG00000157764",
+        ensembl_id_or_symbol="ENSG00000157764",
         target_species="macaca_mulatta",
     )
     assert isinstance(results, list)
@@ -72,7 +72,7 @@ def test_by_species_with_symbol_or_id_returns_homology_results(mock_get, get_hom
 def test_by_species_with_symbol_or_id_url_construction(mock_get, get_homology_instance):
     get_homology_instance.by_species_with_symbol_or_id(
         reference_species="human",
-        ensembl_id_or_species="ENSG00000157764",
+        ensembl_id_or_symbol="ENSG00000157764",
         aligned=False,
         cigar_line=False,
         compara="vertebrates",
