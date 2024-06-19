@@ -64,7 +64,11 @@ class GetHomology(Ensembl):
         self._max_workers: int = max_workers
         self._show_progress: bool = show_progress
 
-        super().__init__(max_workers=self._max_workers, show_progress=self._show_progress, cache=cache)
+        super().__init__(
+            max_workers=self._max_workers,
+            show_progress=self._show_progress,
+            cache=cache,
+        )
 
     @property
     def url(self) -> str:
