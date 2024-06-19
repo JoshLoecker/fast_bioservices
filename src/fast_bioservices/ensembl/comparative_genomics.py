@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Literal, Optional
 
-from fast_bioservices.ensembl import Ensembl
+from fast_bioservices.ensembl.ensembl import Ensembl
 
 
 @dataclass
@@ -58,7 +58,7 @@ class GetHomology(Ensembl):
     def __init__(
         self,
         max_workers: int,
-        show_progress: bool,
+        show_progress: bool = True,
         cache: bool = True,
     ):
         self._max_workers: int = max_workers
@@ -73,7 +73,7 @@ class GetHomology(Ensembl):
     def by_species_with_symbol_or_id(
         self,
         reference_species: str,
-        ensembl_id_or_species: str,
+        ensembl_id_or_symbol: str,
         aligned: bool = True,
         cigar_line: bool = True,
         compara: str = "vertebrates",
@@ -84,10 +84,10 @@ class GetHomology(Ensembl):
         target_taxon: Optional[int] = None,
         type: Literal["orthologues", "paralogues", "projections", "all"] = "all",
     ) -> List[HomologyResult]:
-        if ensembl_id_or_species.startswith("ENSG"):
-            path = f"/homology/id/{reference_species}/{ensembl_id_or_species}?"
+        if ensembl_id_or_symbol.startswith("ENSG"):
+            path = f"/homology/id/{reference_species}/{ensembl_id_or_symbol}?"
         else:
-            path = f"/homology/symbol/{reference_species}/{ensembl_id_or_species}?"
+            path = f"/homology/symbol/{reference_species}/{ensembl_id_or_symbol}?"
         if aligned:
             path += "aligned"
         if cigar_line:
@@ -117,7 +117,7 @@ def main():
     e = GetHomology(max_workers=1, show_progress=True)
     e.by_species_with_symbol_or_id(
         reference_species="human",
-        ensembl_id_or_species="ENSG00000157764",
+        ensembl_id_or_symbol="ENSG00000157764",
         target_species="macaca_mulatta",
     )
 
