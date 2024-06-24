@@ -22,6 +22,12 @@ class Species:
     display_name: str
 
 
+@dataclass
+class FuzzyResult:
+    species: Species
+    score: float
+
+
 class Ensembl(BaseModel, FastHTTP):
     def __init__(
         self,
@@ -43,7 +49,7 @@ class Ensembl(BaseModel, FastHTTP):
     def url(self) -> str:
         return self._url
 
-    def _get_species(self) -> List[Species]:
+    def __get_species(self) -> List[Species]:
         path = self._url + "/info/species"
         response = self._get(path, headers={"Content-Type": "application/json"})
         species: list[Species] = []
@@ -70,18 +76,22 @@ class Ensembl(BaseModel, FastHTTP):
             The species object from the Ensembl API
         """
         species = species.lower()
-        species_list = self._get_species()
-        matches: list[list[str]] = []
+        species_list = self.__get_species()
+
+        matches: list[FuzzyResult] = []
         for possible_matches in species_list:
-            result = 
-            matches.append(f)
-        print(matches)
-        return None
+            score = fuzzy_search(query=species, possibilities=possible_matches.aliases)
+            matches.append(FuzzyResult(possible_matches, score))
+
+        if not matches:
+            return None
+        highest_match = max(matches, key=lambda x: x.score)
+        return highest_match.species
 
 
 def main():
     e = Ensembl(max_workers=1, show_progress=True)
-    e._match_species("homo_sapien")
+    e._match_species("human")
 
 
 if __name__ == "__main__":
