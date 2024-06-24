@@ -1,7 +1,7 @@
 [project]
-name    = "fast_bioservices"
-dynamic = ["description", "version"]
-# description     = "A fast way to access and convert biological information"
+name            = "fast_bioservices"
+dynamic         = ["version"]
+description     = "A fast way to access and convert biological information"
 authors         = [{ name = "Josh Loecker", email = "joshloecker@gmail.com" }]
 dependencies    = ["appdirs>=1.4.4", "pandas>=2.2.2", "rich>=13.7"]
 requires-python = ">=3.9"
@@ -19,9 +19,8 @@ distribution = true
 source = "file"
 path   = "src/fast_bioservices/__init__.py"
 
-[tool.pdm.description]
-source = "file"
-path   = "src/fast_bioservices/__init__.py"
-
 [tool.pdm.dev-dependencies]
 test = ["pytest>=8.2"]
+
+[tool.ruff]
+line-length = 120

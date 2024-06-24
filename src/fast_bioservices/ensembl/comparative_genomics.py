@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl
 
@@ -57,7 +57,7 @@ class GetAlignment(Ensembl):
 class GetHomology(Ensembl):
     def __init__(
         self,
-        max_workers: int,
+        max_workers: int = 4,
         show_progress: bool = True,
         cache: bool = True,
     ):
@@ -77,7 +77,7 @@ class GetHomology(Ensembl):
     def by_species_with_symbol_or_id(
         self,
         reference_species: str,
-        ensembl_id_or_symbol: str,
+        ensembl_id_or_symbol: Union[str, List[str]],
         aligned: bool = True,
         cigar_line: bool = True,
         compara: str = "vertebrates",
@@ -88,25 +88,30 @@ class GetHomology(Ensembl):
         target_taxon: Optional[int] = None,
         type: Literal["orthologues", "paralogues", "projections", "all"] = "all",
     ) -> List[HomologyResult]:
-        if ensembl_id_or_symbol.startswith("ENSG"):
-            path = f"/homology/id/{reference_species}/{ensembl_id_or_symbol}?"
-        else:
-            path = f"/homology/symbol/{reference_species}/{ensembl_id_or_symbol}?"
-        if aligned:
-            path += "aligned"
-        if cigar_line:
-            path += ";cigar_line"
-        if external_db != "":
-            path += f";external_db={external_db}"
-        if target_species != "":
-            path += f";target_species={target_species}"
-        if target_taxon is not None:
-            path += f";target_taxon={target_taxon}"
-        path += f";compara={compara};format={format};sequence={sequence};type={type};content-type=application/json"
+        ensembl_id_or_symbol = [ensembl_id_or_symbol] if isinstance(ensembl_id_or_symbol, str) else ensembl_id_or_symbol
+
+        urls = []
+        for e_id in ensembl_id_or_symbol:
+            path = f"/homology/symbol/{reference_species}/{e_id}?"
+            if e_id.startswith("ENSG"):
+                path = path.replace("/symbol/", "/id/")
+            path += f"compara={compara};format={format};sequence={sequence};type={type}"
+
+            if aligned:
+                path += ";aligned"
+            if cigar_line:
+                path += ";cigar_line"
+            if external_db != "":
+                path += f";external_db={external_db}"
+            if target_species != "":
+                path += f";target_species={target_species}"
+            if target_taxon is not None:
+                path += f";target_taxon={target_taxon}"
+            urls.append(self._url + path)
 
         homology_results: list[HomologyResult] = []
         results = self._get(
-            urls=self._url + path,
+            urls=urls,
             headers={"Content-Type": "application/json"},
         )
         for result in results:

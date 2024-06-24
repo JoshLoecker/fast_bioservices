@@ -3,10 +3,9 @@ import pytest
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 
-# Make biodbnet_instance exist for the lifetime of the tests
 @pytest.fixture(scope="session")
 def biodbnet_instance():
-    return BioDBNet(cache=False, show_progress=False)
+    return BioDBNet(max_workers=1, cache=False, show_progress=False)
 
 
 @pytest.fixture

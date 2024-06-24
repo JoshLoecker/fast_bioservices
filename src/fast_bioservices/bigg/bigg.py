@@ -1,20 +1,28 @@
 import json
 from typing import Any, Literal, Mapping, Optional
 
+from fast_bioservices._base import BaseModel
 from fast_bioservices._fast_http import FastHTTP
-from fast_bioservices.base import BaseModel
 
 
 class BiGG(BaseModel, FastHTTP):
     _download_url: str = "http://bigg.ucsd.edu/static/models"
 
-    def __init__(self, cache: bool = True, show_progress: bool = True):
+    def __init__(
+        self,
+        max_workers: int = 4,
+        cache: bool = True,
+        show_progress: bool = True,
+    ):
         self._url: str = "http://bigg.ucsd.edu/api/v2"
-        # self._max_workers: int = 10
-
-        # Initialize parent classes
         BaseModel.__init__(self, url=self._url)
-        FastHTTP.__init__(self, cache=cache, max_workers=10, show_progress=show_progress, max_requests_per_second=10)
+        FastHTTP.__init__(
+            self,
+            cache=cache,
+            workers=max_workers,
+            show_progress=show_progress,
+            max_requests_per_second=10,
+        )
 
     @property
     def url(self) -> str:

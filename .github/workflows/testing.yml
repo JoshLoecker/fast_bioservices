@@ -6,25 +6,34 @@ on:
             - main
         types: [opened, reopened, edited, synchronize]
 
+concurrency:
+    group: testing-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  build:
+  test:
+    name: Test with Python ${{ matrix.python-version }} on ${{ matrix.os }}
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    
     steps:  
       - uses: actions/checkout@v4
+        with:
+            fetch-depth: 0
 
-      - name: Setup PDM
-        uses: pdm-project/setup-pdm@v4
+      - name: Setup Python for ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
             python-version: ${{ matrix.python-version }}
-            cache: true
-      
-      - name: Install dependencies
-        run: pdm install --dev
-
-      - name: Test with pytest  
-        run: pdm run pytest
+            
+      - name: Install tox
+        run: python -m pip install tox-gh>=1.2
+        
+      - name: Setup test suite
+        run: tox -vv --notest
+        
+      - name: Run test suite
+        run: tox --skip-pkg-install

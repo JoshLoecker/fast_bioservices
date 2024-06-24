@@ -4,10 +4,9 @@ import pytest
 from fast_bioservices.ensembl.comparative_genomics import GetHomology, HomologyResult
 
 
-@pytest.fixture
-def get_homology_instance(scope="session"):
-    return GetHomology(max_workers=1, show_progress=False)
-
+@pytest.fixture(scope="session")
+def get_homology_instance():
+    return GetHomology(cache=False, max_workers=1, show_progress=False)
 
 def test_get_homology_instance_creation(get_homology_instance):
     assert get_homology_instance is not None
@@ -83,5 +82,7 @@ def test_by_species_with_symbol_or_id_url_construction(mock_get, get_homology_in
         target_taxon=123,
         type="orthologues",
     )
-    expected_url = "https://rest.ensembl.org/homology/id/human/ENSG00000157764?;external_db=test_db;target_species=macaca_mulatta;target_taxon=123;compara=vertebrates;format=full;sequence=protein;type=orthologues;content-type=application/json"
+    expected_url = [
+        "https://rest.ensembl.org/homology/id/human/ENSG00000157764?compara=vertebrates;format=full;sequence=protein;type=orthologues;external_db=test_db;target_species=macaca_mulatta;target_taxon=123"
+    ]
     mock_get.assert_called_with(urls=expected_url, headers={"Content-Type": "application/json"})
