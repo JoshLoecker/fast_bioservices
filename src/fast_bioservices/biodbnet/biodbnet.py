@@ -3,36 +3,27 @@ from typing import Dict, List, Literal, Union
 
 import pandas as pd
 
+from fast_bioservices._base import BaseModel
 from fast_bioservices._fast_http import FastHTTP, Response
-from fast_bioservices.base import BaseModel
+from fast_bioservices._log import logger
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.log import logger
 
 
 class BioDBNet(BaseModel, FastHTTP):
     def __init__(
         self,
+        max_workers: int = 4,
         show_progress: bool = True,
         cache: bool = True,
     ):
         self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
-        self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
         self._chunk_size: int = 250
-        self._max_workers: int = 10
 
         BaseModel.__init__(self, url=self._url)
         FastHTTP.__init__(
             self,
             cache=cache,
-            max_workers=self._max_workers,
-            max_requests_per_second=10,
-            show_progress=show_progress,
-        )
-        BaseModel.__init__(self, url=self._url)
-        FastHTTP.__init__(
-            self,
-            cache=cache,
-            max_workers=self._max_workers,
+            workers=max_workers,
             max_requests_per_second=10,
             show_progress=show_progress,
         )
@@ -97,7 +88,8 @@ class BioDBNet(BaseModel, FastHTTP):
         return taxon_list[0] if len(taxon_list) == 1 else taxon_list
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
-        url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}"
+        url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}&directOutput=1"
+        print(url)
         outputs = self._get(url, temp_disable_cache=True)[0].json
         return outputs["output"]
 
