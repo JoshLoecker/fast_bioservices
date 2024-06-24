@@ -4,10 +4,9 @@ import pytest
 from fast_bioservices import BiGG
 
 
-# Make bigg_instance exist for the lifetime of the tests
 @pytest.fixture(scope="session")
 def bigg_instance():
-    return BiGG(cache=False, show_progress=False)
+    return BiGG(max_workers=1, cache=False, show_progress=False)
 
 
 def test_version(bigg_instance):

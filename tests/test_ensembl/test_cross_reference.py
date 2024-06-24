@@ -4,7 +4,7 @@ from fast_bioservices.ensembl.cross_references import CrossReference, EnsemblRef
 
 @pytest.fixture(scope="session")
 def cross_reference() -> CrossReference:
-    return CrossReference(max_workers=1)
+    return CrossReference(max_workers=1, cache=False, show_progress=False)
 
 
 def test_get_ensembl_from_external(cross_reference: CrossReference):
