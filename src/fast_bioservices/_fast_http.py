@@ -15,8 +15,8 @@ from typing import List, Literal, Optional, Type, TypeVar, Union, overload
 
 from rich.progress import BarColumn, Progress, TimeRemainingColumn
 
-from fast_bioservices.log import logger
-from fast_bioservices.settings import cache_dir
+from fast_bioservices._log import logger
+from fast_bioservices._settings import cache_dir
 
 Method = Literal["GET"]
 ResponseType = TypeVar("ResponseType", bound="Response")
@@ -115,20 +115,21 @@ class FastHTTP(ABC):
     def __init__(
         self,
         cache: bool,
-        max_workers: int,
+        workers: int,
         show_progress: bool,
         max_requests_per_second: Optional[int],
     ) -> None:
-        self._use_cache: bool = cache
-        self._max_workers: int = max_workers
-        self._show_progress: bool = show_progress
         self._max_requests_per_second: int = int(1e10) if max_requests_per_second is None else max_requests_per_second
+        self._maximum_allowed_workers: int = 16
+        self._use_cache: bool = cache
+        self._show_progress: bool = show_progress
+        self._workers: int = self._set_workers(workers)
 
         self._cache_dirpath: Path = cache_dir
         self._requests_made: int = 0
         self._last_request_time: float = 0
 
-        self._thread_pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._thread_pool = ThreadPoolExecutor(max_workers=self._workers)
         self._progress = Progress(
             "[progress.description]{task.description}",
             BarColumn(),
@@ -136,6 +137,25 @@ class FastHTTP(ABC):
             "[progress.percentage]{task.percentage:>3.0f}%",
             TimeRemainingColumn(),
         )
+
+    def _set_workers(self, value: int) -> int:
+        if value < 1:
+            logger.debug("`max_workers` must be greater than 0, setting to 1")
+            value = 1
+        elif value > self._maximum_allowed_workers:
+            logger.debug(
+                f"`max_workers` must be less than {self._maximum_allowed_workers} (received {value}), setting to {self._maximum_allowed_workers}"
+            )
+            value = self._maximum_allowed_workers
+        return value
+
+    @property
+    def workers(self) -> int:
+        return self._workers
+
+    @workers.setter
+    def workers(self, value: int) -> None:
+        self._workers = self._set_workers(value)
 
     def __del__(self):
         self._thread_pool.shutdown(wait=True)
@@ -209,4 +229,4 @@ class FastHTTP(ABC):
 
 
 if __name__ == "__main__":
-    http = FastHTTP(cache=True, max_workers=2, show_progress=True, max_requests_per_second=10)
+    http = FastHTTP(cache=True, workers=2, show_progress=True, max_requests_per_second=10)
