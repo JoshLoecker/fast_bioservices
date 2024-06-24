@@ -5,11 +5,6 @@ from fast_bioservices.ensembl.comparative_genomics import (
     GetHomology,
     HomologyResult,
 )
+from fast_bioservices.ensembl.cross_references import CrossReference
 
-__all__ = [
-    "GetAlignment",
-    "GetCafeTree",
-    "GetGeneTree",
-    "GetHomology",
-    "HomologyResult",
-]
+__all__ = ["GetAlignment", "GetCafeTree", "GetGeneTree", "GetHomology", "HomologyResult", "CrossReference"]
