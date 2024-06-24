@@ -89,11 +89,11 @@ class GetHomology(Ensembl):
         type: Literal["orthologues", "paralogues", "projections", "all"] = "all",
     ) -> List[HomologyResult]:
         if ensembl_id_or_symbol.startswith("ENSG"):
-            path = f"/homology/id/{reference_species}/{ensembl_id_or_symbol}?"
+            path = f"/homology/id/{reference_species}/{ensembl_id_or_symbol}?content-type=application/json"
         else:
-            path = f"/homology/symbol/{reference_species}/{ensembl_id_or_symbol}?"
+            path = f"/homology/symbol/{reference_species}/{ensembl_id_or_symbol}?content-type=application/json"
         if aligned:
-            path += "aligned"
+            path += ";aligned"
         if cigar_line:
             path += ";cigar_line"
         if external_db != "":
@@ -102,7 +102,7 @@ class GetHomology(Ensembl):
             path += f";target_species={target_species}"
         if target_taxon is not None:
             path += f";target_taxon={target_taxon}"
-        path += f";compara={compara};format={format};sequence={sequence};type={type};content-type=application/json"
+        path += f";compara={compara};format={format};sequence={sequence};type={type}"
 
         homology_results: list[HomologyResult] = []
         results = self._get(
