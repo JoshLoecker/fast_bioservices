@@ -8,11 +8,7 @@ on:
 jobs:
   pypi-publish:
     name: Upload release to PyPi
-    runs-on: ${{ matrix.os }}
-    strategy:
-        matrix:
-            os: [ubuntu-latest, windows-latest, macos-latest]
-    
+    runs-on: ubuntu-latest
     permissions:
         id-token: write
     
