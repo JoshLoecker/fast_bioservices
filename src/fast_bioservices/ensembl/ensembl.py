@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from fast_bioservices._base import BaseModel
-from fast_bioservices._fast_http import FastHTTP
-from fast_bioservices._utils import fuzzy_search
+from fast_bioservices.base import BaseModel
+from fast_bioservices.fast_http import FastHTTP
+from fast_bioservices.settings import default_workers
+from fast_bioservices.utils import fuzzy_search
 
 
 @dataclass

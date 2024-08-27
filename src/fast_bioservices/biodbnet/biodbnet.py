@@ -3,10 +3,11 @@ from typing import Dict, List, Literal, Union
 
 import pandas as pd
 
-from fast_bioservices._base import BaseModel
-from fast_bioservices._fast_http import FastHTTP, Response
-from fast_bioservices._log import logger
+from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
+from fast_bioservices.fast_http import FastHTTP, Response
+from fast_bioservices.log import logger
+from fast_bioservices.settings import default_workers
 
 
 class BioDBNet(BaseModel, FastHTTP):
