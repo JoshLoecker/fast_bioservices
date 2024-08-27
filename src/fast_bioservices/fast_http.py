@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import List, Literal, Optional, Type, TypeVar, Union, overload
 
 from rich.progress import BarColumn, Progress, TimeRemainingColumn
+from loguru import logger
 
-from fast_bioservices.log import logger
 from fast_bioservices.settings import cache_dir
 
 Method = Literal["GET"]

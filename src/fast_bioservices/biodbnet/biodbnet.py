@@ -2,11 +2,11 @@ import io
 from typing import Dict, List, Literal, Union
 
 import pandas as pd
+from loguru import logger
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
 from fast_bioservices.fast_http import FastHTTP, Response
-from fast_bioservices.log import logger
 from fast_bioservices.settings import default_workers
 
 
@@ -341,11 +341,11 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
-    biodbnet = BioDBNet(cache=True, show_progress=True)
+    biodbnet = BioDBNet(cache=False, show_progress=True)
     result = biodbnet.db2db(
-        input_values=["4318", "1376", "2576", "10089"],
+        # input_values=["4318", "1376", "2576", "10089"],
+        input_values=["6610", "11001", "8228", "1743", "847"],
         # input_values=[str(i) for i in range(1250)],
-        # annotations=["Genes"],
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
