@@ -89,7 +89,6 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}&directOutput=1"
-        print(url)
         outputs = self._get(url, temp_disable_cache=True)[0].json
         return outputs["output"]
 
