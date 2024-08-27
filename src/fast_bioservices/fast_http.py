@@ -161,7 +161,7 @@ class FastHTTP(ABC):
         self._workers = self._set_workers(value)
 
     def __del__(self):
-        self._thread_pool.shutdown(wait=True)
+        self._thread_pool.shutdown()
 
     @property
     def show_progress(self) -> bool:

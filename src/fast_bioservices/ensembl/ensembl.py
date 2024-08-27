@@ -32,8 +32,8 @@ class FuzzyResult:
 class Ensembl(BaseModel, FastHTTP):
     def __init__(
         self,
-        max_workers: int,
-        show_progress: bool,
+        max_workers: int = default_workers,
+        show_progress: bool = False,
         cache: bool = True,
     ):
         self._url = "https://rest.ensembl.org"

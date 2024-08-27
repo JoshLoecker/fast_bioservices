@@ -11,9 +11,9 @@ class BiGG(BaseModel, FastHTTP):
 
     def __init__(
         self,
-        max_workers: int = 4,
+        max_workers: int = default_workers,
         cache: bool = True,
-        show_progress: bool = True,
+        show_progress: bool = False,
     ):
         self._url: str = "http://bigg.ucsd.edu/api/v2"
         BaseModel.__init__(self, url=self._url)
@@ -139,9 +139,7 @@ class BiGG(BaseModel, FastHTTP):
             temp_disable_cache=temp_disable_cache,
         )[0].json
 
-    def universal_reactions(
-        self, temp_disable_cache: bool = False
-    ) -> Mapping[Any, Any]:
+    def universal_reactions(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
         return self._get(f"{self.url}/universal/reactions", temp_disable_cache=temp_disable_cache)[0].json
 
     def universal_reaction_details(
@@ -154,9 +152,7 @@ class BiGG(BaseModel, FastHTTP):
             temp_disable_cache=temp_disable_cache,
         )[0].json
 
-    def universal_metabolites(
-        self, temp_disable_cache: bool = False
-    ) -> Mapping[Any, Any]:
+    def universal_metabolites(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
         return self._get(f"{self.url}/universal/metabolites", temp_disable_cache=temp_disable_cache)[0].json
 
     def universal_metabolite_details(

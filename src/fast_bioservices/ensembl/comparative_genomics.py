@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl
+from fast_bioservices.settings import default_workers
 
 
 @dataclass
@@ -40,17 +41,20 @@ class HomologyResult:
 
 
 class GetCafeTree(Ensembl):
-    def __init__(self):
+    def __init__(self, *, max_workers: int = default_workers, cache: bool = True, show_progress: bool = False):
+        super().__init__(max_workers=max_workers, show_progress=show_progress, cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
 class GetGeneTree(Ensembl):
-    def __init__(self):
+    def __init__(self, *, max_workers: int = default_workers, cache: bool = True, show_progress: bool = False):
+        super().__init__(max_workers=max_workers, show_progress=show_progress, cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
 class GetAlignment(Ensembl):
-    def __init__(self):
+    def __init__(self, *, max_workers: int = default_workers, cache: bool = True, show_progress: bool = False):
+        super().__init__(max_workers=max_workers, show_progress=show_progress, cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
@@ -58,7 +62,7 @@ class GetHomology(Ensembl):
     def __init__(
         self,
         max_workers: int = 4,
-        show_progress: bool = True,
+        show_progress: bool = False,
         cache: bool = True,
     ):
         self._max_workers: int = max_workers
