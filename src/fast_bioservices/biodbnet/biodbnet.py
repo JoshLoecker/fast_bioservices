@@ -13,8 +13,8 @@ from fast_bioservices.settings import default_workers
 class BioDBNet(BaseModel, FastHTTP):
     def __init__(
         self,
-        max_workers: int = 4,
-        show_progress: bool = True,
+        max_workers: int = default_workers,
+        show_progress: bool = False,
         cache: bool = True,
     ):
         self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
@@ -61,9 +61,7 @@ class BioDBNet(BaseModel, FastHTTP):
         output_list = [output] if not isinstance(output, list) else output
 
         if direct_output:
-            return all(
-                [o.value in self.getDirectOutputsForInput(input_) for o in output_list]
-            )
+            return all([o.value in self.getDirectOutputsForInput(input_) for o in output_list])
         return all([o.value in self.getOutputsForInput(input_) for o in output_list])
 
     def _validate_taxon_id(
@@ -76,13 +74,8 @@ class BioDBNet(BaseModel, FastHTTP):
                 taxon_list[i] = taxon_list[i].value
 
             logger.debug(f"Validating taxon ID '{taxon_list[i]}'")
-            taxon_url: str = (
-                f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
-            )
-            if (
-                "No items found."
-                in self._get(taxon_url, temp_disable_cache=True)[0].text
-            ):
+            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
+            if "No items found." in self._get(taxon_url, temp_disable_cache=True)[0].text:
                 raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
 
@@ -160,18 +153,14 @@ class BioDBNet(BaseModel, FastHTTP):
         else:
             output_db_value = ",".join([o.value for o in output_db])
         logger.debug(f"Got an input database with a value of '{input_db.value}'")
-        logger.debug(
-            f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'"
-        )
+        logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=db2db&format=row")
             urls[-1] += f"&input={input_db.value}"
             urls[-1] += f"&outputs={output_db_value}"
-            urls[-1] += (
-                f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
-            )
+            urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
 
         responses: List[Response] = self._get(urls=urls)
@@ -251,9 +240,7 @@ class BioDBNet(BaseModel, FastHTTP):
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
                 urls.append(self.url + "?method=dbfind&format=row")
-                urls[-1] += (
-                    f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
-                )
+                urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
                 urls[-1] += f"&output={out_db.value}"
                 urls[-1] += f"&taxonId={taxon_id}"
 
@@ -282,9 +269,7 @@ class BioDBNet(BaseModel, FastHTTP):
             for i in range(0, len(input_values), self._chunk_size):
                 urls.append(self.url + "?method=dbortho")
                 urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
-                urls[-1] += (
-                    f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
-                )
+                urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
                 urls[-1] += f"&inputTaxon={input_taxon_value}"
                 urls[-1] += f"&outputTaxon={output_taxon_value}"
                 urls[-1] += f"&output={out_db.value.replace(' ', '').lower()}"
@@ -352,9 +337,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
         buffer = io.StringIO(self._get(url)[0].text)
-        return pd.read_csv(
-            buffer, sep="\t", header=None, names=[input_db.value, output_db.value]
-        )
+        return pd.read_csv(buffer, sep="\t", header=None, names=[input_db.value, output_db.value])
 
 
 if __name__ == "__main__":
