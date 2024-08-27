@@ -32,8 +32,8 @@ class ExternalReference:
 class CrossReference(Ensembl):
     def __init__(
         self,
-        max_workers: int = 4,
-        show_progress: bool = True,
+        max_workers: int = default_workers,
+        show_progress: bool = False,
         cache: bool = True,
     ):
         self._max_workers: int = max_workers
