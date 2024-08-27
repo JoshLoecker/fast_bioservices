@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl, Species
+from fast_bioservices.settings import default_workers
 
 
 @dataclass(frozen=True)

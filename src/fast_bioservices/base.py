@@ -2,7 +2,7 @@ from abc import ABC
 
 
 class BaseModel(ABC):
-    def __init__(self, url: str):
+    def __init__(self, *, url: str):
         self._url: str = url
 
     @property

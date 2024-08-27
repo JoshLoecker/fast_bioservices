@@ -14,12 +14,13 @@ from pathlib import Path
 from typing import List, Literal, Optional, Type, TypeVar, Union, overload
 
 from rich.progress import BarColumn, Progress, TimeRemainingColumn
+from loguru import logger
 
-from fast_bioservices._log import logger
-from fast_bioservices._settings import cache_dir
+from fast_bioservices.settings import cache_dir
 
 Method = Literal["GET"]
 ResponseType = TypeVar("ResponseType", bound="Response")
+
 
 class Response:
     def __new__(cls, *args, **kwargs):
@@ -111,9 +112,11 @@ class Response:
         instance._method = data["method"]
         return instance
 
+
 class FastHTTP(ABC):
     def __init__(
         self,
+        *,
         cache: bool,
         workers: int,
         show_progress: bool,
@@ -197,6 +200,15 @@ class FastHTTP(ABC):
         cache_filepath = self._calculate_cache_key(response.url)
         with lzma.open(cache_filepath, "wb") as cache_file:
             pickle.dump(response.cache_object(), cache_file)
+
+    def _post(
+        self,
+        urls: Union[str, List[str]],
+        data: Union[dict, List[dict]],
+        headers: Optional[dict] = None,
+        temp_disable_cache: bool = False,
+    ) -> List[Response]:
+        pass
 
     def _get(
         self,
