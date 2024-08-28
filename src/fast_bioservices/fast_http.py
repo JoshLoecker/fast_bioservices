@@ -13,7 +13,6 @@ from http.client import HTTPResponse
 from pathlib import Path
 from typing import List, Literal, Optional, Type, TypeVar, Union, overload
 
-from rich.progress import BarColumn, Progress, TimeRemainingColumn
 from loguru import logger
 
 from fast_bioservices.settings import cache_dir
@@ -28,13 +27,21 @@ class Response:
             raise NotImplementedError("Use `from_response` or `from_cache` to create a Response object")
         return super().__new__(cls)
 
-    def __init__(self) -> None:
-        self._url: str
-        self._headers: dict
-        self._debug_level: int
-        self._content: bytes
-        self._status: int
-        self._method: Method
+    def __init__(
+        self,
+        url: str,
+        headers: dict,
+        debug_level: int,
+        content: bytes,
+        status: int,
+        method: Method,
+    ) -> None:
+        self._url: str = url
+        self._headers: dict = headers
+        self._debug_level: int = debug_level
+        self._content: bytes = content
+        self._status: int = status
+        self._method: Method = method
 
     @property
     def url(self) -> str:
@@ -66,12 +73,12 @@ class Response:
             "method": self._method,
         }
 
-    @overload
     @classmethod
+    @overload
     def create(cls: Type[ResponseType], response: HTTPResponse, method: Method) -> "Response": ...
 
-    @overload
     @classmethod
+    @overload
     def create(cls: Type[ResponseType], *, data: dict) -> "Response": ...  # Use `*` to force keyword-only arguments
 
     @classmethod
@@ -87,29 +94,30 @@ class Response:
     def _from_response(cls, response: HTTPResponse, method: Method) -> "Response":
         # Ensure that the classmethod is called from `create`
         cls._from_class_method = True
-        instance = cls()
-        delattr(cls, "_from_class_method")
-
-        instance._url = response.geturl()
-        instance._headers = dict(response.getheaders())
-        instance._debug_level = response.debuglevel
-        instance._content = response.read()
-        instance._status = response.getcode()
-        instance._method = method
+        instance = cls(
+            url=response.geturl(),
+            headers=dict(response.getheaders()),
+            debug_level=response.debuglevel,
+            content=response.read(),
+            status=response.getcode(),
+            method=method,
+        )
+        # delattr(instance, "_from_class_method")
         return instance
 
     @classmethod
     def _from_cache(cls, data: dict) -> "Response":
         # Ensure that the classmethod is called from `create`
         cls._from_class_method = True
-        instance = cls()
-        delattr(cls, "_from_class_method")
-
-        instance._url = data["url"]
-        instance._headers = data["headers"]
-        instance._debug_level = data["debug_level"]
-        instance._content = data["content"]
-        instance._method = data["method"]
+        instance = cls(
+            url=data["url"],
+            headers=data["headers"],
+            debug_level=data["debug_level"],
+            content=data["content"],
+            status=data["status"],
+            method=data["method"],
+        )
+        delattr(instance, "_from_class_method")
         return instance
 
 
@@ -133,13 +141,6 @@ class FastHTTP(ABC):
         self._last_request_time: float = 0
 
         self._thread_pool = ThreadPoolExecutor(max_workers=self._workers)
-        self._progress = Progress(
-            "[progress.description]{task.description}",
-            BarColumn(),
-            "{task.completed}/{task.total} batches",
-            "[progress.percentage]{task.percentage:>3.0f}%",
-            TimeRemainingColumn(),
-        )
 
     def _set_workers(self, value: int) -> int:
         if value < 1:
@@ -171,7 +172,8 @@ class FastHTTP(ABC):
     def show_progress(self, value: bool) -> None:
         self._show_progress = value
 
-    def _make_safe_url(self, urls: Union[str, List[str]]) -> List[str]:
+    @staticmethod
+    def _make_safe_url(urls: Union[str, List[str]]) -> List[str]:
         # Safe characters from https://stackoverflow.com/questions/695438
         safe = "&$+,/:;=?@#"
         if isinstance(urls, str):
@@ -183,7 +185,8 @@ class FastHTTP(ABC):
         cache_file = Path(self._cache_dirpath, cache_key)
         return cache_file
 
-    def __get_without_cache(self, url: str, headers: dict) -> Response:
+    @staticmethod
+    def __get_without_cache(url: str, headers: dict) -> Response:
         request = urllib.request.Request(url, headers=headers)
         response: HTTPResponse = urllib.request.urlopen(request)
         return Response.create(response=response, method="GET")
@@ -192,7 +195,7 @@ class FastHTTP(ABC):
         cache_file = self._calculate_cache_key(url)
         if cache_file.exists():
             logger.debug(f"Cache hit: {url}")
-            with lzma.open(cache_file, "rb") as cache_file:
+            with lzma.open(cache_file) as cache_file:
                 return Response.create(data=pickle.load(cache_file))
         return None
 
@@ -206,9 +209,8 @@ class FastHTTP(ABC):
         urls: Union[str, List[str]],
         data: Union[dict, List[dict]],
         headers: Optional[dict] = None,
-        temp_disable_cache: bool = False,
     ) -> List[Response]:
-        pass
+        raise NotImplementedError()
 
     def _get(
         self,
@@ -218,24 +220,17 @@ class FastHTTP(ABC):
     ) -> List[Response]:
         headers = headers or {}
         urls = self._make_safe_url(urls)
-        task = self._progress.add_task("[cyan]Working...", total=len(urls)) if self._progress else None
-        callable = self.__get_from_cache if self._use_cache and not temp_disable_cache else self.__get_without_cache
+        callable_ = self.__get_from_cache if self._use_cache and not temp_disable_cache else self.__get_without_cache
 
         responses: List[Response] = []
-        futures: List[Future[Union[Response, None]]] = [
-            self._thread_pool.submit(callable, url, headers) for (url, headers) in zip(urls, [headers] * len(urls))
-        ]
+        futures: List[Future[Response]] = []
+        for url in urls:
+            futures.append(self._thread_pool.submit(callable_, url, headers))
 
-        for url, future in zip(urls, as_completed(futures)):
-            response = future.result()
-            if response is not None:
-                responses.append(response)
-            else:
-                responses.append(self.__get_without_cache(url, headers))
-                if self._use_cache:
-                    self._save_to_cache(responses[-1])
-            if self._progress and task is not None:
-                self._progress.update(task, advance=1)
+        for i, future in enumerate(as_completed(futures), start=1):
+            responses.append(future.result())
+            if self._show_progress:
+                logger.debug(f"Finished {i} of {len(urls)} tasks")
 
         return responses
 
