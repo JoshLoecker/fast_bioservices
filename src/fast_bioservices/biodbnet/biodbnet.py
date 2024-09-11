@@ -11,23 +11,12 @@ from fast_bioservices.settings import default_workers
 
 
 class BioDBNet(BaseModel, FastHTTP):
-    def __init__(
-        self,
-        max_workers: int = default_workers,
-        show_progress: bool = False,
-        cache: bool = True,
-    ):
+    def __init__(self, max_workers: int = default_workers, cache: bool = True):
         self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
         self._chunk_size: int = 250
 
         BaseModel.__init__(self, url=self._url)
-        FastHTTP.__init__(
-            self,
-            cache=cache,
-            workers=max_workers,
-            max_requests_per_second=10,
-            show_progress=show_progress,
-        )
+        FastHTTP.__init__(self, cache=cache, workers=max_workers, max_requests_per_second=10)
 
     @property
     def url(self) -> str:
@@ -341,7 +330,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
-    biodbnet = BioDBNet(cache=False, show_progress=True)
+    biodbnet = BioDBNet(cache=False)
     result = biodbnet.db2db(
         # input_values=["4318", "1376", "2576", "10089"],
         input_values=["6610", "11001", "8228", "1743", "847"],

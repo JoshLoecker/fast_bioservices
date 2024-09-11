@@ -6,7 +6,7 @@ from fast_bioservices import BiGG
 
 @pytest.fixture(scope="session")
 def bigg_instance():
-    return BiGG(max_workers=1, cache=False, show_progress=False)
+    return BiGG(max_workers=1, cache=False)
 
 
 def test_version(bigg_instance):

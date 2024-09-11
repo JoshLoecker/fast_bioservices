@@ -6,7 +6,8 @@ from fast_bioservices.ensembl.comparative_genomics import GetHomology, HomologyR
 
 @pytest.fixture(scope="session")
 def get_homology_instance():
-    return GetHomology(cache=False, max_workers=1, show_progress=False)
+    return GetHomology(cache=False, max_workers=1)
+
 
 def test_get_homology_instance_creation(get_homology_instance):
     assert get_homology_instance is not None

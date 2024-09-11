@@ -41,8 +41,8 @@ class HomologyResult:
 
 
 class GetCafeTree(Ensembl):
-    def __init__(self, *, max_workers: int = default_workers, cache: bool = True, show_progress: bool = False):
-        super().__init__(max_workers=max_workers, show_progress=show_progress, cache=cache)
+    def __init__(self, *, max_workers: int = default_workers, cache: bool = True):
+        super().__init__(max_workers=max_workers, cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
@@ -59,20 +59,10 @@ class GetAlignment(Ensembl):
 
 
 class GetHomology(Ensembl):
-    def __init__(
-        self,
-        max_workers: int = 4,
-        show_progress: bool = False,
-        cache: bool = True,
-    ):
+    def __init__(self, max_workers: int = 4, cache: bool = True):
         self._max_workers: int = max_workers
-        self._show_progress: bool = show_progress
 
-        super().__init__(
-            max_workers=self._max_workers,
-            show_progress=self._show_progress,
-            cache=cache,
-        )
+        super().__init__(max_workers=self._max_workers, cache=cache)
 
     @property
     def url(self) -> str:
@@ -127,7 +117,7 @@ class GetHomology(Ensembl):
 
 
 def main():
-    e = GetHomology(max_workers=1, show_progress=True)
+    e = GetHomology(max_workers=1, cache=False)
     e.by_species_with_symbol_or_id(
         reference_species="human",
         ensembl_id_or_symbol="ENSG00000157764",

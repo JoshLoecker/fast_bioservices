@@ -30,21 +30,10 @@ class FuzzyResult:
 
 
 class Ensembl(BaseModel, FastHTTP):
-    def __init__(
-        self,
-        max_workers: int = default_workers,
-        show_progress: bool = False,
-        cache: bool = True,
-    ):
+    def __init__(self, max_workers: int = default_workers, cache: bool = True):
         self._url = "https://rest.ensembl.org"
         BaseModel.__init__(self, url=self._url)
-        FastHTTP.__init__(
-            self,
-            cache=cache,
-            workers=max_workers,
-            max_requests_per_second=15,
-            show_progress=show_progress,
-        )
+        FastHTTP.__init__(self, cache=cache, workers=max_workers, max_requests_per_second=15)
 
     @property
     def url(self) -> str:
@@ -91,7 +80,7 @@ class Ensembl(BaseModel, FastHTTP):
 
 
 def main():
-    e = Ensembl(max_workers=1, show_progress=True)
+    e = Ensembl(max_workers=1)
     e._match_species("human")
 
 

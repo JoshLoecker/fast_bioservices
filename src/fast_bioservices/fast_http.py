@@ -133,7 +133,6 @@ class FastHTTP(ABC):
         self._max_requests_per_second: int = int(1e10) if max_requests_per_second is None else max_requests_per_second
         self._maximum_allowed_workers: int = 16
         self._use_cache: bool = cache
-        self._show_progress: bool = show_progress
         self._workers: int = self._set_workers(workers)
 
         self._cache_dirpath: Path = cache_dir
@@ -236,4 +235,4 @@ class FastHTTP(ABC):
 
 
 if __name__ == "__main__":
-    http = FastHTTP(cache=True, workers=2, show_progress=True, max_requests_per_second=10)
+    http = FastHTTP(cache=True, workers=2, max_requests_per_second=10)

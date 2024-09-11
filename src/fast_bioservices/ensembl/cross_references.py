@@ -30,20 +30,10 @@ class ExternalReference:
 
 
 class CrossReference(Ensembl):
-    def __init__(
-        self,
-        max_workers: int = default_workers,
-        show_progress: bool = False,
-        cache: bool = True,
-    ):
+    def __init__(self, max_workers: int = default_workers, cache: bool = True):
         self._max_workers: int = max_workers
-        self._show_progress: bool = show_progress
 
-        super().__init__(
-            max_workers=self._max_workers,
-            show_progress=self._show_progress,
-            cache=cache,
-        )
+        super().__init__(max_workers=self._max_workers, cache=cache)
 
     def get_ensembl_from_external(
         self,

@@ -9,21 +9,10 @@ from fast_bioservices.settings import default_workers
 class BiGG(BaseModel, FastHTTP):
     _download_url: str = "http://bigg.ucsd.edu/static/models"
 
-    def __init__(
-        self,
-        max_workers: int = default_workers,
-        cache: bool = True,
-        show_progress: bool = False,
-    ):
+    def __init__(self, max_workers: int = default_workers, cache: bool = True):
         self._url: str = "http://bigg.ucsd.edu/api/v2"
         BaseModel.__init__(self, url=self._url)
-        FastHTTP.__init__(
-            self,
-            cache=cache,
-            workers=max_workers,
-            show_progress=show_progress,
-            max_requests_per_second=10,
-        )
+        FastHTTP.__init__(self, cache=cache, workers=max_workers, max_requests_per_second=10)
 
     @property
     def url(self) -> str:
@@ -68,10 +57,7 @@ class BiGG(BaseModel, FastHTTP):
         elif not download_path.endswith(f"{model_id}.{format}"):
             download_path = f"{download_path}/{model_id}.{format}"
 
-        response = self._get(
-            f"{self.download_url}/{model_id}.{format}",
-            temp_disable_cache=temp_disable_cache,
-        )
+        response = self._get(f"{self.download_url}/{model_id}.{format}", temp_disable_cache=temp_disable_cache)
 
         if format == "json":
             json.dump(response[0].json, open(download_path, "w"), indent=2)
