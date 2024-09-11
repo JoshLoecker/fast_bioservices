@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl
@@ -47,14 +48,14 @@ class GetCafeTree(Ensembl):
 
 
 class GetGeneTree(Ensembl):
-    def __init__(self, *, max_workers: int = default_workers, cache: bool = True, show_progress: bool = False):
-        super().__init__(max_workers=max_workers, show_progress=show_progress, cache=cache)
+    def __init__(self, *, max_workers: int = default_workers, cache: bool = True):
+        super().__init__(max_workers=max_workers, cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
 class GetAlignment(Ensembl):
-    def __init__(self, *, max_workers: int = default_workers, cache: bool = True, show_progress: bool = False):
-        super().__init__(max_workers=max_workers, show_progress=show_progress, cache=cache)
+    def __init__(self, *, max_workers: int = default_workers, cache: bool = True):
+        super().__init__(max_workers=max_workers, cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
@@ -109,10 +110,23 @@ class GetHomology(Ensembl):
             headers={"Content-Type": "application/json"},
         )
         for result in results:
-            id_ = result.json["data"][0]["id"]
-            homologies: list = result.json["data"][0]["homologies"]
+            as_json = json.loads(result)
+            id_ = as_json["data"][0]["id"]
+            homologies: list = as_json["data"][0]["homologies"]
+
             for homology in homologies:
-                homology_results.append(HomologyResult(**homology, id=id_))
+                source = HomologySource(**homology["source"])
+                target = HomologyTarget(**homology["target"])
+                result = HomologyResult(
+                    id=id_,
+                    method_link_type=homology["method_link_type"],
+                    taxonomy_level=homology["taxonomy_level"],
+                    dn_ds=homology["dn_ds"],
+                    type=homology["type"],
+                    target=target,
+                    source=source,
+                )
+                homology_results.append(result)
         return homology_results
 
 

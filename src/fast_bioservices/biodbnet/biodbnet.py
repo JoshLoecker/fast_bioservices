@@ -1,12 +1,13 @@
 import io
 from typing import Dict, List, Literal, Union
+import json
 
 import pandas as pd
 from loguru import logger
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import FastHTTP, Response
+from fast_bioservices.fast_http import FastHTTP
 from fast_bioservices.settings import default_workers
 
 
@@ -64,7 +65,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
             logger.debug(f"Validating taxon ID '{taxon_list[i]}'")
             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
-            if "No items found." in self._get(taxon_url, temp_disable_cache=True)[0].text:
+            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True)[0]):
                 raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
 
@@ -72,17 +73,19 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}&directOutput=1"
-        outputs = self._get(url, temp_disable_cache=True)[0].json
-        return outputs["output"]
+        outputs = self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0]
+        as_json = json.loads(outputs)
+        return as_json["output"]
 
     def getInputs(self) -> List[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self._get(url, temp_disable_cache=True)[0].json
-        return inputs["input"]
+        inputs = self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0]
+        as_json = json.loads(inputs)
+        return as_json["input"]
 
     def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs = self._get(url, temp_disable_cache=True)[0].json
+        valid_outputs = json.loads(self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0].decode())
         return valid_outputs["output"]
 
     def getAllPathways(
@@ -93,10 +96,10 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon_id = self._validate_taxon_id(taxon)
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
-        result = self._get(url)[0].json
+        as_json = json.loads(self._get(url)[0].decode())
         if as_dataframe:
-            return pd.DataFrame(result)
-        return result  # type: ignore
+            return pd.DataFrame(as_json)
+        return as_json
 
     def getPathwayFromDatabase(
         self,
@@ -113,11 +116,11 @@ class BioDBNet(BaseModel, FastHTTP):
             pathways = [pathways]
 
         url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
-        result = self._get(url)[0].json
+        as_json = json.loads(self._get(url)[0].decode())
 
         if as_dataframe:
-            return pd.DataFrame(result)
-        return result  # type: ignore
+            return pd.DataFrame(as_json)
+        return as_json
 
     def db2db(
         self,
@@ -128,7 +131,7 @@ class BioDBNet(BaseModel, FastHTTP):
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)
         if not self._are_nodes_valid(input_db, output_db):
-            out_db = [output_db] if not isinstance(output_db, list) else output_db
+            out_db: list = [output_db] if not isinstance(output_db, list) else output_db
             raise ValueError(
                 "You have provided an invalid output database(s).\n"
                 "A common result of this problem is including the input database as an output database.\n"
@@ -152,10 +155,11 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
 
-        responses: List[Response] = self._get(urls=urls)
+        responses: List[bytes] = self._get(urls=urls)
         df = pd.DataFrame()
         for response in responses:
-            df = pd.concat([df, pd.DataFrame(response.json)])
+            as_json = json.loads(response.decode())
+            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
 
         df.rename(columns={"InputValue": input_db.value}, inplace=True)
         logger.debug(f"Returning dataframe with {len(df)} rows")
@@ -188,12 +192,12 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&dbPath={'->'.join(databases)}"
             urls[-1] += f"&taxonId={taxon_id}"
 
-        responses: List[Response] = self._get(urls)
+        responses: List[bytes] = self._get(urls)
         df = pd.DataFrame()
         for response in responses:
-            df = pd.concat([df, pd.DataFrame(response.json)])
+            as_json = json.loads(response.decode())
+            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
         df = df.rename(columns={"InputValue": str(db_path[0].value)})
-
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df
 
@@ -203,16 +207,14 @@ class BioDBNet(BaseModel, FastHTTP):
         input_db: Union[Input, Output],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ):
+        return NotImplementedError
         taxon_id = self._validate_taxon_id(taxon)
-
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=dbreport&format=row")
             urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
             urls[-1] += f"inputValues={','.join(input_values[i:i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
-
-        return NotImplementedError
 
     def dbFind(
         self,
@@ -233,10 +235,11 @@ class BioDBNet(BaseModel, FastHTTP):
                 urls[-1] += f"&output={out_db.value}"
                 urls[-1] += f"&taxonId={taxon_id}"
 
-        responses: List[Response] = self._get(urls=urls)
+        responses: List[bytes] = self._get(urls=urls)
         df = pd.DataFrame()
         for response in responses:
-            df = pd.concat([df, pd.DataFrame(response.json)])
+            as_json = json.loads(response.decode())
+            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
         return df
 
     def dbOrtho(
@@ -264,10 +267,11 @@ class BioDBNet(BaseModel, FastHTTP):
                 urls[-1] += f"&output={out_db.value.replace(' ', '').lower()}"
                 urls[-1] += "&format=row"
 
-        responses: List[Response] = self._get(urls=urls)
+        responses: List[bytes] = self._get(urls=urls)
         df = pd.DataFrame()
         for response in responses:
-            df = pd.concat([df, pd.DataFrame(response.json)])
+            as_json = json.loads(response.decode())
+            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
 
         # Remove potential duplicate columns
         for column in df.columns:
@@ -306,10 +310,11 @@ class BioDBNet(BaseModel, FastHTTP):
             urls[-1] += f"&annotations={','.join(annotations_)}"
             urls[-1] += "&format=row"
 
-        responses: list[Response] = self._get(urls=urls)
+        responses: list[bytes] = self._get(urls=urls)
         df = pd.DataFrame()
         for response in responses:
-            df = pd.concat([df, pd.DataFrame(response.json)])
+            as_json = json.loads(response.decode())
+            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
         df = df.rename(columns={"InputValue": "Input Value"})
         return df
 
@@ -325,7 +330,7 @@ class BioDBNet(BaseModel, FastHTTP):
         output_db_val = output_db.value.replace(" ", "_")
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
-        buffer = io.StringIO(self._get(url)[0].text)
+        buffer = io.StringIO(self._get(url)[0].decode())
         return pd.read_csv(buffer, sep="\t", header=None, names=[input_db.value, output_db.value])
 
 

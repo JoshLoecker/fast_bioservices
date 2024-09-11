@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl, Species
@@ -59,7 +60,7 @@ class CrossReference(Ensembl):
 
         references: list[EnsemblReference] = []
         for i, result in enumerate(self._get(urls=urls, headers={"Content-Type": "application/json"})):
-            as_json = result.json[0]
+            as_json = json.loads(result.decode())[0]
             references.append(EnsemblReference(**as_json, input=gene_symbols[i]))
         return references
 
@@ -89,7 +90,7 @@ class CrossReference(Ensembl):
 
         references: list[ExternalReference] = []
         for result in self._get(urls=urls, headers={"Content-Type": "application/json"}):
-            as_json = result.json[0]
+            as_json = json.loads(result.decode())[0]
             references.append(ExternalReference(**as_json))
 
         return references

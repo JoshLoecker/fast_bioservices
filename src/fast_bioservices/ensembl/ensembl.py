@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from typing import List, Optional
 
 from fast_bioservices.base import BaseModel
@@ -43,7 +44,8 @@ class Ensembl(BaseModel, FastHTTP):
         path = self._url + "/info/species"
         response = self._get(path, headers={"Content-Type": "application/json"})
         species: list[Species] = []
-        for item in response[0].json["species"]:
+        as_json = json.loads(response[0].decode())
+        for item in as_json["species"]:
             species.append(Species(**item))
         return species
 
