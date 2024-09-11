@@ -1,5 +1,4 @@
 import hashlib
-import json
 import lzma
 import pickle
 import urllib
@@ -11,7 +10,7 @@ from abc import ABC
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from http.client import HTTPResponse
 from pathlib import Path
-from typing import List, Literal, Optional, Type, TypeVar, Union, overload
+from typing import List, Literal, Optional, TypeVar, Union
 
 from loguru import logger
 
@@ -29,8 +28,10 @@ class FastHTTP(ABC):
         workers: int,
         max_requests_per_second: Optional[int],
     ) -> None:
-        self._max_requests_per_second: int = int(1e10) if max_requests_per_second is None else max_requests_per_second
-        self._maximum_allowed_workers: int = 16
+        self._max_requests_per_second: int = (
+            float("inf") if max_requests_per_second is None else max_requests_per_second
+        )
+        self._maximum_allowed_workers: int = 5
         self._use_cache: bool = cache
         self._workers: int = self._set_workers(workers)
 
@@ -60,15 +61,10 @@ class FastHTTP(ABC):
         self._workers = self._set_workers(value)
 
     def __del__(self):
-        self._thread_pool.shutdown()
-
-    @property
-    def show_progress(self) -> bool:
-        return self._show_progress
-
-    @show_progress.setter
-    def show_progress(self, value: bool) -> None:
-        self._show_progress = value
+        try:
+            self._thread_pool.shutdown()
+        except AttributeError:
+            pass
 
     @staticmethod
     def _make_safe_url(urls: Union[str, List[str]]) -> List[str]:
