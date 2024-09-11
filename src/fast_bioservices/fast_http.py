@@ -21,113 +21,12 @@ Method = Literal["GET"]
 ResponseType = TypeVar("ResponseType", bound="Response")
 
 
-class Response:
-    def __new__(cls, *args, **kwargs):
-        if not hasattr(cls, "_from_class_method"):
-            raise NotImplementedError("Use `from_response` or `from_cache` to create a Response object")
-        return super().__new__(cls)
-
-    def __init__(
-        self,
-        url: str,
-        headers: dict,
-        debug_level: int,
-        content: bytes,
-        status: int,
-        method: Method,
-    ) -> None:
-        self._url: str = url
-        self._headers: dict = headers
-        self._debug_level: int = debug_level
-        self._content: bytes = content
-        self._status: int = status
-        self._method: Method = method
-
-    @property
-    def url(self) -> str:
-        return self._url
-
-    @property
-    def headers(self) -> dict:
-        return self._headers
-
-    @property
-    def bytes(self) -> bytes:
-        return self._content
-
-    @property
-    def text(self) -> str:
-        return self.bytes.decode()
-
-    @property
-    def json(self) -> dict:
-        return json.loads(self.text)
-
-    def cache_object(self) -> dict:
-        return {
-            "url": self._url,
-            "headers": self._headers,
-            "debug_level": self._debug_level,
-            "content": self._content,
-            "status": self._status,
-            "method": self._method,
-        }
-
-    @classmethod
-    @overload
-    def create(cls: Type[ResponseType], response: HTTPResponse, method: Method) -> "Response": ...
-
-    @classmethod
-    @overload
-    def create(cls: Type[ResponseType], *, data: dict) -> "Response": ...  # Use `*` to force keyword-only arguments
-
-    @classmethod
-    def create(cls: Type[ResponseType], response=None, method=None, data=None) -> "Response":
-        if response is not None and method is not None:
-            return cls._from_response(response, method)
-        elif data is not None:
-            return cls._from_cache(data)
-        else:
-            raise ValueError("Either (`response` and `method`) or (`data`) must be provided")
-
-    @classmethod
-    def _from_response(cls, response: HTTPResponse, method: Method) -> "Response":
-        # Ensure that the classmethod is called from `create`
-        cls._from_class_method = True
-        instance = cls(
-            url=response.geturl(),
-            headers=dict(response.getheaders()),
-            debug_level=response.debuglevel,
-            content=response.read(),
-            status=response.getcode(),
-            method=method,
-        )
-        # delattr(instance, "_from_class_method")
-        return instance
-
-    @classmethod
-    def _from_cache(cls, data: dict) -> "Response":
-        # Ensure that the classmethod is called from `create`
-        cls._from_class_method = True
-        instance = cls(
-            url=data["url"],
-            headers=data["headers"],
-            debug_level=data["debug_level"],
-            content=data["content"],
-            status=data["status"],
-            method=data["method"],
-        )
-        delattr(instance, "_from_class_method")
-        return instance
-
-
 class FastHTTP(ABC):
     def __init__(
         self,
         *,
         cache: bool,
         workers: int,
-        show_progress: bool,
         max_requests_per_second: Optional[int],
     ) -> None:
         self._max_requests_per_second: int = int(1e10) if max_requests_per_second is None else max_requests_per_second
@@ -184,52 +83,66 @@ class FastHTTP(ABC):
         cache_file = Path(self._cache_dirpath, cache_key)
         return cache_file
 
-    @staticmethod
-    def __get_without_cache(url: str, headers: dict) -> Response:
+    def __get_without_cache(self, url: str, headers: dict) -> bytes:
         request = urllib.request.Request(url, headers=headers)
         response: HTTPResponse = urllib.request.urlopen(request)
-        return Response.create(response=response, method="GET")
+        content: bytes = response.read()
+        if self._use_cache:
+            self._save_to_cache(url, content=content)
+        return content
 
-    def __get_from_cache(self, url: str, headers: dict) -> Optional[Response]:
+    def __get_from_cache(self, url: str, headers: dict) -> Optional[bytes]:
         cache_file = self._calculate_cache_key(url)
         if cache_file.exists():
-            logger.debug(f"Cache hit: {url}")
+            logger.trace(f"Cache hit: {url}")
             with lzma.open(cache_file) as cache_file:
-                return Response.create(data=pickle.load(cache_file))
+                return pickle.load(cache_file)
         return None
 
-    def _save_to_cache(self, response: Response) -> None:
-        cache_filepath = self._calculate_cache_key(response.url)
+    def _save_to_cache(self, url: str, content: bytes) -> None:
+        cache_filepath = self._calculate_cache_key(url)
         with lzma.open(cache_filepath, "wb") as cache_file:
-            pickle.dump(response.cache_object(), cache_file)
-
-    def _post(
-        self,
-        urls: Union[str, List[str]],
-        data: Union[dict, List[dict]],
-        headers: Optional[dict] = None,
-    ) -> List[Response]:
-        raise NotImplementedError()
+            pickle.dump(obj=content, file=cache_file)
 
     def _get(
         self,
         urls: Union[str, List[str]],
         headers: Optional[dict] = None,
         temp_disable_cache: bool = False,
-    ) -> List[Response]:
+        temp_disable_progress: bool = False,
+    ) -> List[bytes]:
         headers = headers or {}
         urls = self._make_safe_url(urls)
-        callable_ = self.__get_from_cache if self._use_cache and not temp_disable_cache else self.__get_without_cache
+        callable_ = self.__get_from_cache if (self._use_cache and not temp_disable_cache) else self.__get_without_cache
 
-        responses: List[Response] = []
-        futures: List[Future[Response]] = []
+        futures: list[Future[bytes]] = []
+        url_mapping: dict[Future, str] = {}
         for url in urls:
-            futures.append(self._thread_pool.submit(callable_, url, headers))
+            future = self._thread_pool.submit(callable_, url=url, headers=headers)
+            futures.append(future)
+            url_mapping[future] = url
 
-        for i, future in enumerate(as_completed(futures), start=1):
-            responses.append(future.result())
-            if self._show_progress:
-                logger.debug(f"Finished {i} of {len(urls)} tasks")
+        responses: List[bytes] = []
+        finished_count: int = 0
+        while futures:
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    url = url_mapping[future]
+                    if result is None:
+                        new_future = self._thread_pool.submit(self.__get_without_cache, url=url, headers=headers)
+                        futures.append(new_future)
+                        url_mapping[new_future] = url
+                    else:
+                        responses.append(result)
+                        finished_count += 1
+                        if not temp_disable_progress:
+                            logger.debug(f"Finished {finished_count} of {len(urls)} tasks")
+                except Exception as e:
+                    logger.error(f"Error in future: {e}")
+                    raise e
+                finally:
+                    futures.remove(future)
 
         return responses
 
