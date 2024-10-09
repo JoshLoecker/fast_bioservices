@@ -21,4 +21,4 @@ path = "src/fast_bioservices/__init__.py"
 dev-dependencies = ["pytest>=8.3.2"]
 
 [tool.ruff]
-line-length = 120
+line-length = 150
