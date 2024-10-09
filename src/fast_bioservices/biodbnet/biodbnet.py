@@ -1,6 +1,6 @@
 import io
-from typing import Dict, List, Literal, Union
 import json
+from typing import Dict, List, Literal, Union
 
 import pandas as pd
 from loguru import logger
@@ -59,13 +59,18 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Union[int, Taxon, List[Union[int, Taxon]]],
     ) -> Union[int, List[int]]:
         taxon_list: list = taxon if isinstance(taxon, list) else [taxon]
+
+        # return early if all items are of instance `Taxon` because the built-in values are valid
+        if all(isinstance(t, Taxon) for t in taxon_list):
+            return taxon_list[0] if len(taxon_list) == 1 else taxon_list
+
         for i in range(len(taxon_list)):
             if isinstance(taxon_list[i], Taxon):
                 taxon_list[i] = taxon_list[i].value
 
             logger.debug(f"Validating taxon ID '{taxon_list[i]}'")
             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
-            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True)[0]):
+            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, temp_disable_progress=True)[0]):
                 raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
 
@@ -179,8 +184,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
             if not self._are_nodes_valid(current_db, next_db, direct_output=True):
                 raise ValueError(
-                    "You have provided an invalid output database.\n"
-                    f"Unable to navigate from '{current_db.value}' to '{next_db.value}'"
+                    "You have provided an invalid output database.\n" f"Unable to navigate from '{current_db.value}' to '{next_db.value}'"
                 )
         logger.debug("Databases are valid")
         databases: list[str] = [d.value.replace(" ", "").lower() for d in db_path]
@@ -335,13 +339,19 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
-    biodbnet = BioDBNet(cache=False)
+    import sys
+
+    from loguru import logger
+
+    logger.remove()
+    logger.add(sys.stderr, level="TRACE")
+
+    biodbnet = BioDBNet(cache=True)
     result = biodbnet.db2db(
-        # input_values=["4318", "1376", "2576", "10089"],
-        input_values=["6610", "11001", "8228", "1743", "847"],
+        input_values=[str(i) for i in range(1500)],
+        # input_values=["6610", "11001", "8228", "1743", "847"],
         # input_values=[str(i) for i in range(1250)],
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
     )
-    print(result)
