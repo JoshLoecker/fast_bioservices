@@ -1,32 +1,32 @@
 import hashlib
 import lzma
 import pickle
+import time
 import urllib
 import urllib.error
 import urllib.parse
 import urllib.request
 import urllib.response
 from abc import ABC
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from http.client import HTTPResponse
 from pathlib import Path
-from typing import List, Literal, Optional, TypeVar, Union
+from typing import List, Literal, Optional, Union
 
 from loguru import logger
 
 from fast_bioservices.settings import cache_dir
 
 Method = Literal["GET"]
-ResponseType = TypeVar("ResponseType", bound="Response")
 
 
 class FastHTTP(ABC):
     def __init__(
-        self,
-        *,
-        cache: bool,
-        workers: int,
-        max_requests_per_second: Optional[int],
+            self,
+            *,
+            cache: bool,
+            workers: int,
+            max_requests_per_second: Optional[int],
     ) -> None:
         self._max_requests_per_second: int = (
             float("inf") if max_requests_per_second is None else max_requests_per_second
@@ -80,6 +80,18 @@ class FastHTTP(ABC):
         return cache_file
 
     def __get_without_cache(self, url: str, headers: dict) -> bytes:
+        # Rate limiting
+        self._requests_made += 1
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        if (
+                self._requests_made > self._max_requests_per_second
+                and time_since_last_request < 1
+        ):
+            time.sleep(1 - time_since_last_request)
+            self._requests_made -= self._max_requests_per_second
+        self._last_request_time = current_time
+
         request = urllib.request.Request(url, headers=headers)
         response: HTTPResponse = urllib.request.urlopen(request)
         content: bytes = response.read()
@@ -101,15 +113,19 @@ class FastHTTP(ABC):
             pickle.dump(obj=content, file=cache_file)
 
     def _get(
-        self,
-        urls: Union[str, List[str]],
-        headers: Optional[dict] = None,
-        temp_disable_cache: bool = False,
-        temp_disable_progress: bool = False,
+            self,
+            urls: Union[str, List[str]],
+            headers: Optional[dict] = None,
+            temp_disable_cache: bool = False,
+            temp_disable_progress: bool = False,
     ) -> List[bytes]:
         headers = headers or {}
         urls = self._make_safe_url(urls)
-        callable_ = self.__get_from_cache if (self._use_cache and not temp_disable_cache) else self.__get_without_cache
+        callable_ = (
+            self.__get_from_cache
+            if (self._use_cache and not temp_disable_cache)
+            else self.__get_without_cache
+        )
 
         futures: list[Future[bytes]] = []
         url_mapping: dict[Future, str] = {}
@@ -121,19 +137,26 @@ class FastHTTP(ABC):
         responses: List[bytes] = []
         finished_count: int = 0
         while futures:
-            for future in as_completed(futures):
+            for future in wait(futures).done:
                 try:
                     result = future.result()
                     url = url_mapping[future]
-                    if result is None:
-                        new_future = self._thread_pool.submit(self.__get_without_cache, url=url, headers=headers)
+                    if result is None:  # Cache miss
+                        logger.trace(f"Cache miss for {url}")
+
+                        new_future = self._thread_pool.submit(
+                            self.__get_without_cache, url=url, headers=headers
+                        )
                         futures.append(new_future)
                         url_mapping[new_future] = url
-                    else:
+                    else:  # Cache hit
+                        logger.trace(f"Cache hit for {url}")
                         responses.append(result)
                         finished_count += 1
                         if not temp_disable_progress:
-                            logger.debug(f"Finished {finished_count} of {len(urls)} tasks")
+                            logger.debug(
+                                f"Finished {finished_count} of {len(urls)} tasks"
+                            )
                 except Exception as e:
                     logger.error(f"Error in future: {e}")
                     raise e
