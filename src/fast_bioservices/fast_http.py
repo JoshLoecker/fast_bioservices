@@ -22,15 +22,13 @@ Method = Literal["GET"]
 
 class FastHTTP(ABC):
     def __init__(
-            self,
-            *,
-            cache: bool,
-            workers: int,
-            max_requests_per_second: Optional[int],
+        self,
+        *,
+        cache: bool,
+        workers: int,
+        max_requests_per_second: Optional[int],
     ) -> None:
-        self._max_requests_per_second: int = (
-            float("inf") if max_requests_per_second is None else max_requests_per_second
-        )
+        self._max_requests_per_second: int = float("inf") if max_requests_per_second is None else max_requests_per_second
         self._maximum_allowed_workers: int = 5
         self._use_cache: bool = cache
         self._workers: int = self._set_workers(workers)
@@ -84,10 +82,7 @@ class FastHTTP(ABC):
         self._requests_made += 1
         current_time = time.time()
         time_since_last_request = current_time - self._last_request_time
-        if (
-                self._requests_made > self._max_requests_per_second
-                and time_since_last_request < 1
-        ):
+        if self._requests_made > self._max_requests_per_second and time_since_last_request < 1:
             time.sleep(1 - time_since_last_request)
             self._requests_made -= self._max_requests_per_second
         self._last_request_time = current_time
@@ -113,19 +108,15 @@ class FastHTTP(ABC):
             pickle.dump(obj=content, file=cache_file)
 
     def _get(
-            self,
-            urls: Union[str, List[str]],
-            headers: Optional[dict] = None,
-            temp_disable_cache: bool = False,
-            temp_disable_progress: bool = False,
+        self,
+        urls: Union[str, List[str]],
+        headers: Optional[dict] = None,
+        temp_disable_cache: bool = False,
+        temp_disable_progress: bool = False,
     ) -> List[bytes]:
         headers = headers or {}
         urls = self._make_safe_url(urls)
-        callable_ = (
-            self.__get_from_cache
-            if (self._use_cache and not temp_disable_cache)
-            else self.__get_without_cache
-        )
+        callable_ = self.__get_from_cache if (self._use_cache and not temp_disable_cache) else self.__get_without_cache
 
         futures: list[Future[bytes]] = []
         url_mapping: dict[Future, str] = {}
@@ -142,21 +133,14 @@ class FastHTTP(ABC):
                     result = future.result()
                     url = url_mapping[future]
                     if result is None:  # Cache miss
-                        logger.trace(f"Cache miss for {url}")
-
-                        new_future = self._thread_pool.submit(
-                            self.__get_without_cache, url=url, headers=headers
-                        )
+                        new_future = self._thread_pool.submit(self.__get_without_cache, url=url, headers=headers)
                         futures.append(new_future)
                         url_mapping[new_future] = url
                     else:  # Cache hit
-                        logger.trace(f"Cache hit for {url}")
                         responses.append(result)
                         finished_count += 1
                         if not temp_disable_progress:
-                            logger.debug(
-                                f"Finished {finished_count} of {len(urls)} tasks"
-                            )
+                            logger.debug(f"Finished {finished_count} of {len(urls)} tasks")
                 except Exception as e:
                     logger.error(f"Error in future: {e}")
                     raise e

@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 
@@ -116,12 +117,8 @@ def test_dbReport(biodbnet_no_cache):
 
 
 def test_dbFind(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
-    result_nocache = biodbnet_no_cache.dbFind(
-        input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS
-    )
-    result_cache = biodbnet_cache.dbFind(
-        input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS
-    )
+    result_nocache = biodbnet_no_cache.dbFind(input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS)
+    result_cache = biodbnet_cache.dbFind(input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS)
 
     assert len(result_nocache) == len(result_cache) == 4
     for id_, symbol in zip(gene_ids, gene_symbols):
@@ -131,7 +128,7 @@ def test_dbFind(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
         assert symbol in result_cache["Gene Symbol"].values
 
 
-def test_dbOrtho(biodbnet_no_cache, gene_ids):
+def test_dbOrtho(biodbnet_no_cache, biodbnet_cache, gene_ids):
     result_nocache = biodbnet_no_cache.dbOrtho(
         input_values=gene_ids,
         input_db=Input.GENE_ID,
@@ -139,7 +136,7 @@ def test_dbOrtho(biodbnet_no_cache, gene_ids):
         input_taxon=Taxon.HOMO_SAPIENS,
         output_taxon=Taxon.MUS_MUSCULUS,
     )
-    result_cache = biodbnet_no_cache.dbOrtho(
+    result_cache = biodbnet_cache.dbOrtho(
         input_values=gene_ids,
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,

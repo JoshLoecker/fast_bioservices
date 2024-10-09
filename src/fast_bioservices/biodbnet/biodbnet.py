@@ -57,24 +57,28 @@ class BioDBNet(BaseModel, FastHTTP):
     def _validate_taxon_id(
         self,
         taxon: Union[int, Taxon, List[Union[int, Taxon]]],
-    ) -> Union[int, List[int]]:
-        taxon_list: list = taxon if isinstance(taxon, list) else [taxon]
+    ) -> List[int]:
+        taxon_list: list[int] = []
 
-        # return early if all items are of instance `Taxon` because the built-in values are valid
-        if all(isinstance(t, Taxon) for t in taxon_list):
-            return taxon_list[0] if len(taxon_list) == 1 else taxon_list
+        if isinstance(taxon, Taxon):
+            taxon_list.append(taxon.value)
+        elif isinstance(taxon, int):
+            taxon_list.append(taxon)
+        elif isinstance(taxon, list):
+            for t in taxon:
+                if isinstance(t, Taxon):
+                    taxon_list.append(t.value)
+                elif isinstance(t, int):
+                    taxon_list.append(t)
 
-        for i in range(len(taxon_list)):
-            if isinstance(taxon_list[i], Taxon):
-                taxon_list[i] = taxon_list[i].value
-
-            logger.debug(f"Validating taxon ID '{taxon_list[i]}'")
-            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={taxon_list[i]}"
+        for t in taxon_list:
+            logger.debug(f"Validating taxon ID '{t}'")
+            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
             if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, temp_disable_progress=True)[0]):
-                raise ValueError(f"Unable to find taxon '{taxon_list[i]}'")
+                raise ValueError(f"Unable to find taxon '{t}'")
         logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
 
-        return taxon_list[0] if len(taxon_list) == 1 else taxon_list
+        return taxon_list
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}&directOutput=1"
@@ -98,7 +102,7 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Union[Taxon, int],
         as_dataframe: bool = False,
     ) -> Union[pd.DataFrame, List[Dict[str, str]]]:
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
         as_json = json.loads(self._get(url)[0].decode())
@@ -115,7 +119,7 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
         as_dataframe: bool = True,
     ) -> Union[pd.DataFrame, List[Dict[str, str]]]:
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
 
         if isinstance(pathways, str):
             pathways = [pathways]
@@ -134,7 +138,7 @@ class BioDBNet(BaseModel, FastHTTP):
         output_db: Union[Output, List[Output]],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
         if not self._are_nodes_valid(input_db, output_db):
             out_db: list = [output_db] if not isinstance(output_db, list) else output_db
             raise ValueError(
@@ -176,7 +180,7 @@ class BioDBNet(BaseModel, FastHTTP):
         db_path: List[Union[Input, Output]],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
 
         for i in range(len(db_path) - 1):
             current_db = db_path[i]
@@ -212,7 +216,7 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ):
         return NotImplementedError
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=dbreport&format=row")
@@ -229,7 +233,7 @@ class BioDBNet(BaseModel, FastHTTP):
         if isinstance(output_db, Output):
             output_db = [output_db]
 
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
 
         urls: list[str] = []
         for out_db in output_db:
@@ -244,6 +248,7 @@ class BioDBNet(BaseModel, FastHTTP):
         for response in responses:
             as_json = json.loads(response.decode())
             df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
+        # df.rename(columns={"InputValue": input_db.value}, inplace=True)
         return df
 
     def dbOrtho(
@@ -254,8 +259,8 @@ class BioDBNet(BaseModel, FastHTTP):
         input_taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
         output_taxon: Union[Taxon, int] = Taxon.MUS_MUSCULUS,
     ):
-        input_taxon_value = self._validate_taxon_id(input_taxon)
-        output_taxon_value = self._validate_taxon_id(output_taxon)
+        input_taxon_value = self._validate_taxon_id(input_taxon)[0]
+        output_taxon_value = self._validate_taxon_id(output_taxon)[0]
 
         if isinstance(output_db, Output):
             output_db = [output_db]
@@ -303,7 +308,7 @@ class BioDBNet(BaseModel, FastHTTP):
         ],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)
+        taxon_id = self._validate_taxon_id(taxon)[0]
 
         annotations_ = [a.replace(" ", "").lower() for a in annotations]
         urls: list[str] = []
@@ -339,6 +344,13 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
+
+    def gene_ids() -> list[str]:
+        return ["4318", "1376", "2576", "10089"]
+
+    def gene_symbols() -> list[str]:
+        return ["MMP9", "CPT2", "GAGE4", "KCNK7"]
+
     import sys
 
     from loguru import logger
@@ -346,12 +358,6 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(sys.stderr, level="TRACE")
 
-    biodbnet = BioDBNet(cache=True)
-    result = biodbnet.db2db(
-        input_values=[str(i) for i in range(1500)],
-        # input_values=["6610", "11001", "8228", "1743", "847"],
-        # input_values=[str(i) for i in range(1250)],
-        input_db=Input.GENE_ID,
-        output_db=Output.GENE_SYMBOL,
-        taxon=Taxon.HOMO_SAPIENS,
-    )
+    biodbnet = BioDBNet(cache=False)
+    result = biodbnet.dbFind(input_values=gene_ids(), output_db=Output.GENE_SYMBOL)
+    print(result)
