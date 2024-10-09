@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl, Species
@@ -30,20 +31,10 @@ class ExternalReference:
 
 
 class CrossReference(Ensembl):
-    def __init__(
-        self,
-        max_workers: int = default_workers,
-        show_progress: bool = False,
-        cache: bool = True,
-    ):
+    def __init__(self, max_workers: int = default_workers, cache: bool = True):
         self._max_workers: int = max_workers
-        self._show_progress: bool = show_progress
 
-        super().__init__(
-            max_workers=self._max_workers,
-            show_progress=self._show_progress,
-            cache=cache,
-        )
+        super().__init__(max_workers=self._max_workers, cache=cache)
 
     def get_ensembl_from_external(
         self,
@@ -69,7 +60,7 @@ class CrossReference(Ensembl):
 
         references: list[EnsemblReference] = []
         for i, result in enumerate(self._get(urls=urls, headers={"Content-Type": "application/json"})):
-            as_json = result.json[0]
+            as_json = json.loads(result.decode())[0]
             references.append(EnsemblReference(**as_json, input=gene_symbols[i]))
         return references
 
@@ -99,7 +90,7 @@ class CrossReference(Ensembl):
 
         references: list[ExternalReference] = []
         for result in self._get(urls=urls, headers={"Content-Type": "application/json"}):
-            as_json = result.json[0]
+            as_json = json.loads(result.decode())[0]
             references.append(ExternalReference(**as_json))
 
         return references
