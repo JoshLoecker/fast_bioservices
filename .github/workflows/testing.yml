@@ -1,21 +1,21 @@
 name: Testing
 on:
-    pull_request:
-        branches:
-            - main
-        types: [opened, reopened, edited, synchronize]
+  pull_request:
+    branches:
+      - main
+    types: [ opened, reopened, edited, synchronize ]
 
 concurrency:
-    group: testing-${{ github.ref }}
-    cancel-in-progress: true
+  group: testing-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Test with Python ${{ matrix.python-version }} on ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
-        os: [ubuntu-latest, windows-latest]
+        python-version: [ "3.9", "3.10", "3.11", "3.12", "3.13" ]
+        os: [ ubuntu-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
 
     env:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-            fetch-depth: 0
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5

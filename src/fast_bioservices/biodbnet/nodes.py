@@ -24,6 +24,10 @@ class Taxon(int, Enum):
     XENOPUS_LAEVIS = 8355
     ZEA_MAYS = 4577
 
+    @classmethod
+    def from_int(cls, n: int) -> "Taxon":
+        return cls(n)
+
 
 class Input(str, Enum):
     """
