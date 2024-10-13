@@ -26,6 +26,8 @@ class Taxon(int, Enum):
 
     @classmethod
     def from_int(cls, n: int) -> "Taxon":
+        if n not in cls.__members__:
+            raise ValueError(f"Invalid taxon id: {n}")
         return cls(n)
 
 
