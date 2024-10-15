@@ -74,27 +74,27 @@ class BioDBNet(BaseModel, FastHTTP):
         for t in taxon_list:
             logger.debug(f"Validating taxon ID '{t}'")
             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, temp_disable_progress=True)[0]):
+            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)[0]):
                 raise ValueError(f"Unable to find taxon '{t}'")
-        logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
+        logger.debug(f"Taxon IDs are valid: '{','.join([str(i) for i in taxon_list])}'")
 
         return taxon_list
 
     def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}&directOutput=1"
-        outputs = self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0]
+        outputs = self._get(url, temp_disable_cache=True, log_on_complete=False)[0]
         as_json = json.loads(outputs)
         return as_json["output"]
 
     def getInputs(self) -> List[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0]
+        inputs = self._get(url, temp_disable_cache=True, log_on_complete=False)[0]
         as_json = json.loads(inputs)
         return as_json["input"]
 
     def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
         url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs = json.loads(self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0].decode())
+        valid_outputs = json.loads(self._get(url, temp_disable_cache=True, log_on_complete=False)[0].decode())
         return valid_outputs["output"]
 
     def getAllPathways(
@@ -358,6 +358,10 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(sys.stderr, level="TRACE")
 
-    biodbnet = BioDBNet(cache=False)
-    result = biodbnet.dbFind(input_values=gene_ids(), output_db=Output.GENE_SYMBOL)
+    biodbnet = BioDBNet(cache=True)
+    result = biodbnet.db2db(
+        input_values=[str(i) for i in range(65000)],
+        input_db=Input.GENE_ID,
+        output_db=Output.GENE_SYMBOL,
+    )
     print(result)
