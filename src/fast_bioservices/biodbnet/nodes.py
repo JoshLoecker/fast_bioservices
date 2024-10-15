@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class Taxon(int, Enum):
+class Taxon(Enum):
     ARABIDOPSIS_THALIANA = 3702
     BOS_TAURUS = 9913
     CAENORHABDITIS_ELEGANS = 6239
@@ -31,7 +31,7 @@ class Taxon(int, Enum):
         return cls(n)
 
 
-class Input(str, Enum):
+class Input(Enum):
     """
     These are valid input database types for the BioDBNet API.
     """
@@ -102,7 +102,7 @@ class Input(str, Enum):
     UNISTS_ID = "UniSTS ID"
 
 
-class Output(str, Enum):
+class Output(Enum):
     """
     These are valid output database types for the BioDBNet API.
     """
