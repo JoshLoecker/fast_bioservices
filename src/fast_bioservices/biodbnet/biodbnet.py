@@ -138,7 +138,10 @@ class BioDBNet(BaseModel, FastHTTP):
         output_db: Union[Output, List[Output]],
         taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)[0]
+        taxon_id = self._validate_taxon_id(taxon)
+        if isinstance(taxon_id, list):
+            taxon_id = taxon_id[0]
+
         if not self._are_nodes_valid(input_db, output_db):
             out_db: list = [output_db] if not isinstance(output_db, list) else output_db
             raise ValueError(
