@@ -67,7 +67,7 @@ class BioDBNet(BaseModel, FastHTTP):
         elif isinstance(taxon, int):
             taxon_list.append(taxon)
         elif isinstance(taxon, str):
-            logger.warning(f"The provided taxon ID ('{taxon}') was a string, attempting to map it to a known integer value...")
+            logger.warning(f"The provided taxon ID ('{taxon}') is a string, attempting to map it to a known integer value...")
             taxon_list.append(Taxon.string_to_obj(taxon).value)
         elif isinstance(taxon, list):
             for t in taxon:
@@ -161,16 +161,19 @@ class BioDBNet(BaseModel, FastHTTP):
             output_db_value = output_db.value.lower().replace(" ", "")
         else:
             output_db_value = ",".join([o.value.lower().replace(" ", "") for o in output_db])
-        logger.debug(f"Got an input database with a value of '{input_db.value}'")
+        logger.debug(f"Got an input database with a value of '{input_db.value.lower().replace(' ', '')}'")
         logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
-            urls.append(self.url + "?method=db2db&format=row")
-            urls[-1] += f"&input={input_db.value.lower().replace(' ', '')}"
-            urls[-1] += f"&outputs={output_db_value}"
-            urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
-            urls[-1] += f"&taxonId={taxon_id}"
+            urls.append(
+                f"{self.url}?method=db2db"
+                f"&format=row"
+                f"&input={input_db.value.lower().replace(' ', '')}"
+                f"&outputs={output_db_value}"
+                f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
+                f"&taxonId={taxon_id}"
+            )
 
         responses: List[bytes] = self._get(urls=urls)
         df = pd.DataFrame()

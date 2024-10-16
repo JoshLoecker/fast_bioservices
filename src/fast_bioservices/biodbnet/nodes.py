@@ -34,10 +34,10 @@ class Taxon(Enum):
     @classmethod
     def string_to_obj(cls, n: str) -> "Taxon":
         if n.lower() in ("human", "homo sapien", "homo sapiens"):
-            logger.info(f"Mapped '{n}' to '9606'")
+            logger.info(f"Mapped '{n}' to NCBI taxonomy ID '9606'")
             return Taxon.HOMO_SAPIENS
         elif n.lower() in ("mouse", "mus musculus"):
-            logger.info(f"Mapped '{n}' to '10090'")
+            logger.info(f"Mapped '{n}' to NCBI taxonomy ID '10090'")
             return Taxon.MUS_MUSCULUS
         else:
             raise ValueError(f"Unknown taxon '{n}'")
