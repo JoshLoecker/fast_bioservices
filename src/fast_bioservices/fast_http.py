@@ -159,6 +159,7 @@ class FastHTTP(ABC):
         responses: List[bytes] = []
         while futures:
             for future in wait(futures).done:
+                url = ""
                 try:
                     result = future.result()
                     url = url_mapping[future]
@@ -169,7 +170,7 @@ class FastHTTP(ABC):
                     else:  # Cache hit
                         responses.append(result)
                 except Exception as e:
-                    logger.error(f"Error in future: {e}")
+                    logger.error(f"Error in future: {e} (url: {url})")
                     raise e
                 finally:
                     futures.remove(future)
