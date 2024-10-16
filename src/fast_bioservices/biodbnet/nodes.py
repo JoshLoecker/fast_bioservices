@@ -26,6 +26,10 @@ class Taxon(Enum):
     ZEA_MAYS = 4577
 
     @classmethod
+    def member_values(cls) -> list[int]:
+        return list(cls.__members__.values())
+
+    @classmethod
     def from_int(cls, n: int) -> "Taxon":
         if n not in cls.__members__:
             raise ValueError(f"Invalid taxon id: {n}")

@@ -60,7 +60,7 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         taxon: int | str | Taxon | list[int | str | Taxon],
     ) -> List[int]:
-        taxon_list: list[int | str] = []
+        taxon_list: list[int] = []
 
         if isinstance(taxon, Taxon):
             taxon_list.append(taxon.value)
@@ -83,9 +83,10 @@ class BioDBNet(BaseModel, FastHTTP):
 
         for t in taxon_list:
             logger.debug(f"Validating taxon ID '{t}'")
-            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)[0]):
-                raise ValueError(f"Unable to find taxon '{t}'")
+            if t not in Taxon.member_values():  # All items in the 'Taxon' enum are valid, only need to check items not in enum
+                taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
+                if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)[0]):
+                    raise ValueError(f"Unable to find taxon '{t}'")
         logger.debug(f"Taxon IDs are valid: '{','.join([str(i) for i in taxon_list])}'")
 
         return taxon_list
