@@ -1,7 +1,8 @@
 from enum import Enum
+from loguru import logger
 
 
-class Taxon(int, Enum):
+class Taxon(Enum):
     ARABIDOPSIS_THALIANA = 3702
     BOS_TAURUS = 9913
     CAENORHABDITIS_ELEGANS = 6239
@@ -24,8 +25,29 @@ class Taxon(int, Enum):
     XENOPUS_LAEVIS = 8355
     ZEA_MAYS = 4577
 
+    @classmethod
+    def member_values(cls) -> list[int]:
+        return list(cls.__members__.values())
 
-class Input(str, Enum):
+    @classmethod
+    def from_int(cls, n: int) -> "Taxon":
+        if n not in cls.__members__:
+            raise ValueError(f"Invalid taxon id: {n}")
+        return cls(n)
+
+    @classmethod
+    def string_to_obj(cls, n: str) -> "Taxon":
+        if n.lower() in ("human", "homo sapien", "homo sapiens"):
+            logger.info(f"Mapped '{n}' to NCBI taxonomy ID '9606'")
+            return Taxon.HOMO_SAPIENS
+        elif n.lower() in ("mouse", "mus musculus"):
+            logger.info(f"Mapped '{n}' to NCBI taxonomy ID '10090'")
+            return Taxon.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Unknown taxon '{n}'")
+
+
+class Input(Enum):
     """
     These are valid input database types for the BioDBNet API.
     """
@@ -96,7 +118,7 @@ class Input(str, Enum):
     UNISTS_ID = "UniSTS ID"
 
 
-class Output(str, Enum):
+class Output(Enum):
     """
     These are valid output database types for the BioDBNet API.
     """
