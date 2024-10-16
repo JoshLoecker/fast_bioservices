@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 import json
-from typing import List, Literal, Optional, Union
+from typing import List, Literal
 
 from fast_bioservices.ensembl.ensembl import Ensembl, Species
 from fast_bioservices.settings import default_workers
@@ -39,12 +41,12 @@ class CrossReference(Ensembl):
     def get_ensembl_from_external(
         self,
         species: str,
-        gene_symbols: Union[str, List[str]],
+        gene_symbols: str | List[str],
         db_type: Literal["core"] = "core",
-        external_db_filter: Optional[str] = None,
-        feature_filter: Optional[str] = None,
+        external_db_filter: str | None = None,
+        feature_filter: str | None = None,
     ):
-        validate_species: Optional[Species] = self._match_species(species)
+        validate_species: Species | None = self._match_species(species)
         assert validate_species is not None, f"Species {species} not found"
 
         gene_symbols = [gene_symbols] if isinstance(gene_symbols, str) else gene_symbols
@@ -66,12 +68,12 @@ class CrossReference(Ensembl):
 
     def get_external_from_ensembl(
         self,
-        ensembl_id: Union[str, List[str]],
+        ensembl_id: str | List[str],
         db_type: Literal["core"] = "core",
         all_levels: bool = False,
-        external_db_filter: Optional[str] = None,
-        feature_filter: Optional[str] = None,
-        species: Optional[str] = None,
+        external_db_filter: str | None = None,
+        feature_filter: str | None = None,
+        species: str | None = None,
     ) -> List[ExternalReference]:
         ensembl_id = [ensembl_id] if isinstance(ensembl_id, str) else ensembl_id
 

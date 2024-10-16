@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import lzma
 import pickle
@@ -11,7 +13,7 @@ from abc import ABC
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from http.client import HTTPResponse
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import List, Literal
 
 from loguru import logger
 
@@ -26,7 +28,7 @@ class FastHTTP(ABC):
         *,
         cache: bool,
         workers: int,
-        max_requests_per_second: Optional[int],
+        max_requests_per_second: int | None,
     ) -> None:
         self._max_requests_per_second: int = float("inf") if max_requests_per_second is None else max_requests_per_second
         self._maximum_allowed_workers: int = 5
@@ -67,7 +69,7 @@ class FastHTTP(ABC):
             pass
 
     @staticmethod
-    def _make_safe_url(urls: Union[str, List[str]]) -> List[str]:
+    def _make_safe_url(urls: str | List[str]) -> List[str]:
         # Safe characters from https://stackoverflow.com/questions/695438
         safe = "&$+,/:;=?@#"
         if isinstance(urls, str):
@@ -109,7 +111,7 @@ class FastHTTP(ABC):
 
         return content
 
-    def __get_from_cache(self, url: str, headers: dict, log_on_complete: bool) -> Optional[bytes]:
+    def __get_from_cache(self, url: str, headers: dict, log_on_complete: bool) -> bytes | None:
         cache_file = self._calculate_cache_key(url)
         if cache_file.exists():
             with lzma.open(cache_file) as cache_file:
@@ -125,8 +127,8 @@ class FastHTTP(ABC):
 
     def _get(
         self,
-        urls: Union[str, List[str]],
-        headers: Optional[dict] = None,
+        urls: str | List[str],
+        headers: dict | None = None,
         temp_disable_cache: bool = False,
         log_on_complete: bool = True,
     ) -> List[bytes]:

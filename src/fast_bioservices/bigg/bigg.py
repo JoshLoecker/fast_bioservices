@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import json
-from typing import Any, Literal, Mapping, Optional
+from typing import Any, Literal, Mapping
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.fast_http import FastHTTP
@@ -54,7 +56,7 @@ class BiGG(BaseModel, FastHTTP):
         self,
         model_id: str,
         format: Literal["json", "xml", "mat", "json.gz", "xml.gz", "mat.gz"],
-        download_path: Optional[str] = None,
+        download_path: str | None = None,
         temp_disable_cache: bool = False,
     ) -> None:
         if download_path is None:

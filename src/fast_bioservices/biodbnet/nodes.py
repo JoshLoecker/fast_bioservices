@@ -1,4 +1,5 @@
 from enum import Enum
+from loguru import logger
 
 
 class Taxon(Enum):
@@ -29,6 +30,17 @@ class Taxon(Enum):
         if n not in cls.__members__:
             raise ValueError(f"Invalid taxon id: {n}")
         return cls(n)
+
+    @classmethod
+    def string_to_obj(cls, n: str) -> "Taxon":
+        if n.lower() in ("human", "homo sapien", "homo sapiens"):
+            logger.info(f"Mapped '{n}' to '9606")
+            return Taxon.HOMO_SAPIENS
+        elif n.lower() in ("mouse", "mus musculus"):
+            logger.info(f"Mapped '{n}' to '10090'")
+            return Taxon.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Unknown taxon '{n}'")
 
 
 class Input(Enum):

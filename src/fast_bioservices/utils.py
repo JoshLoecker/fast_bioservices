@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from difflib import SequenceMatcher
-from typing import List, Union
+from typing import List
 
 
 def flatten(lists: list) -> list:
@@ -12,7 +14,7 @@ def flatten(lists: list) -> list:
     return data
 
 
-def fuzzy_search(query: str, possibilities: Union[str, List[str]]) -> float:
+def fuzzy_search(query: str, possibilities: str | List[str]) -> float:
     matcher = SequenceMatcher(isjunk=None, a=query)
     if isinstance(possibilities, str):
         possibilities = [possibilities]
