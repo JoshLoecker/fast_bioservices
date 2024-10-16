@@ -114,16 +114,25 @@ class FastHTTP(ABC):
     def __get_from_cache(self, url: str, headers: dict, log_on_complete: bool) -> bytes | None:
         cache_file = self._calculate_cache_key(url)
         if cache_file.exists():
-            with lzma.open(cache_file) as cache_file:
+            try:
+                with lzma.open(cache_file) as cache_file:
+                    content = pickle.load(cache_file)
                 if log_on_complete:
-                    self._log_on_complete_callback("with cache")  # Only log when the cache file is found
-                return pickle.load(cache_file)
+                    self._log_on_complete_callback("with cache")
+                return content
+            except (pickle.UnpicklingError, lzma.LZMAError) as e:
+                logger.warning(f"Error loading from cache: {e}")
+                cache_file.unlink(missing_ok=True)
         return None
 
     def _save_to_cache(self, url: str, content: bytes) -> None:
         cache_filepath = self._calculate_cache_key(url)
-        with lzma.open(cache_filepath, "wb") as cache_file:
-            pickle.dump(obj=content, file=cache_file)
+        data = pickle.dumps(content)
+        try:
+            with lzma.open(cache_filepath, "wb") as o_stream:
+                o_stream.write(data)
+        except (pickle.PickleError, lzma.LZMAError) as e:
+            logger.warning(f"Error saving to cache; attempted to save to {cache_filepath}: {e}")
 
     def _get(
         self,

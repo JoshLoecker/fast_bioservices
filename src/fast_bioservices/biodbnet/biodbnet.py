@@ -66,12 +66,20 @@ class BioDBNet(BaseModel, FastHTTP):
             taxon_list.append(taxon.value)
         elif isinstance(taxon, int):
             taxon_list.append(taxon)
+        elif isinstance(taxon, str):
+            logger.warning(f"The provided taxon ID ('{taxon}') was a string, attempting to map it to a known integer value...")
+            taxon_list.append(Taxon.string_to_obj(taxon).value)
         elif isinstance(taxon, list):
             for t in taxon:
                 if isinstance(t, Taxon):
                     taxon_list.append(t.value)
                 elif isinstance(t, int):
                     taxon_list.append(t)
+                elif isinstance(t, str):
+                    logger.warning(f"The provided taxon ID ('{t}') is a string, attempting to map it to a known integer value...")
+                    taxon_list.append(Taxon.string_to_obj(t).value)
+        else:
+            raise ValueError(f"Unknown taxon type for '{taxon}': {type(taxon)}")
 
         for t in taxon_list:
             logger.debug(f"Validating taxon ID '{t}'")
@@ -137,9 +145,7 @@ class BioDBNet(BaseModel, FastHTTP):
         output_db: Output | List[Output],
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)
-        if isinstance(taxon_id, list):
-            taxon_id = taxon_id[0]
+        taxon_id = self._validate_taxon_id(taxon)[0]
 
         if not self._are_nodes_valid(input_db, output_db):
             out_db: list = [output_db] if not isinstance(output_db, list) else output_db
@@ -152,16 +158,16 @@ class BioDBNet(BaseModel, FastHTTP):
         logger.debug("Databases are valid")
 
         if isinstance(output_db, Output):
-            output_db_value = output_db.value
+            output_db_value = output_db.value.lower().replace(" ", "")
         else:
-            output_db_value = ",".join([o.value for o in output_db])
+            output_db_value = ",".join([o.value.lower().replace(" ", "") for o in output_db])
         logger.debug(f"Got an input database with a value of '{input_db.value}'")
         logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=db2db&format=row")
-            urls[-1] += f"&input={input_db.value}"
+            urls[-1] += f"&input={input_db.value.lower().replace(' ', '')}"
             urls[-1] += f"&outputs={output_db_value}"
             urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
@@ -346,24 +352,12 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
-
-    def gene_ids() -> list[str]:
-        return ["4318", "1376", "2576", "10089"]
-
-    def gene_symbols() -> list[str]:
-        return ["MMP9", "CPT2", "GAGE4", "KCNK7"]
-
-    import sys
-
-    from loguru import logger
-
-    logger.remove()
-    logger.add(sys.stderr, level="TRACE")
+    df = pd.read_csv("/Users/joshl/Downloads/A.csv", index_col=0)
 
     biodbnet = BioDBNet(cache=True)
     result = biodbnet.db2db(
-        input_values=[str(i) for i in range(65000)],
-        input_db=Input.GENE_ID,
-        output_db=Output.GENE_SYMBOL,
+        input_values=df.index.tolist(),
+        input_db=Input.GENE_SYMBOL,
+        output_db=[Output.ENSEMBL_GENE_ID, Output.GENE_ID, Output.CHROMOSOMAL_LOCATION],
     )
     print(result)
