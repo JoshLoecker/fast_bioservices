@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import sys
 import time
 import urllib.parse
@@ -25,7 +26,11 @@ MAX_CACHE: str = f"max-age={sys.maxsize}"
 def _key_generator(request: httpx.Request | httpcore.Request, body: bytes = b"") -> str:
     if isinstance(request, httpx.Request):
         request = httpcore.Request(
-            method=str(request.method), url=str(request.url), headers=request.headers, content=request.content, extensions=request.extensions
+            method=str(request.method),
+            url=str(request.url),
+            headers=request.headers,
+            content=request.content,
+            extensions=request.extensions,
         )
     key = generate_key(request, body)
     method = request.method.decode("ascii") if isinstance(request.method, bytes) else request.method
@@ -94,8 +99,7 @@ class RateLimit(httpx.BaseTransport):
                 break
 
         self.requests_in_period.append(now)
-        response = self.transport.handle_request(request)
-        return response
+        return self.transport.handle_request(request)
 
 
 class FastHTTP(ABC):
@@ -142,10 +146,8 @@ class FastHTTP(ABC):
         self._workers = self._set_workers(value)
 
     def __del__(self):
-        try:
+        with contextlib.suppress(AttributeError):
             self._thread_pool.shutdown()
-        except AttributeError:
-            pass
 
     @staticmethod
     def _make_safe_url(urls: str | List[str]) -> List[str]:
@@ -173,12 +175,11 @@ class FastHTTP(ABC):
             logger.critical(f"Connect error on url: {url}")
             raise e
 
-        if log_on_complete:
-            if "from_cache" in response.extensions.keys():
-                if response.extensions["from_cache"]:
-                    self._log_on_complete_callback("with cache")
-                else:
-                    self._log_on_complete_callback("without cache")
+        if log_on_complete and "from_cache" in response.extensions.keys():
+            if response.extensions["from_cache"]:
+                self._log_on_complete_callback("with cache")
+            else:
+                self._log_on_complete_callback("without cache")
 
         return response.content
 
