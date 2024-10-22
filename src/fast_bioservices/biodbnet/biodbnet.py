@@ -132,7 +132,7 @@ class BioDBNet(BaseModel, FastHTTP):
         if isinstance(pathways, str):
             pathways = [pathways]
 
-        url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
+        url = f"{self.url}?method=getpathways&pathways={','.join(sorted(pathways))}&taxonId={taxon_id}"
         as_json = json.loads(self._get(url)[0].decode())
 
         if as_dataframe:
@@ -161,10 +161,13 @@ class BioDBNet(BaseModel, FastHTTP):
         if isinstance(output_db, Output):
             output_db_value = output_db.value.lower().replace(" ", "")
         else:
-            output_db_value = ",".join([o.value.lower().replace(" ", "") for o in output_db])
+            output_db_value = ",".join(sorted([o.value.lower().replace(" ", "") for o in output_db]))
         logger.debug(f"Got an input database with a value of '{input_db.value.lower().replace(' ', '')}'")
         logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
+        # https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi?method=db2db
+
+        input_values.sort()
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(
@@ -176,7 +179,7 @@ class BioDBNet(BaseModel, FastHTTP):
                 f"&taxonId={taxon_id}"
             )
 
-        responses: List[bytes] = self._get(urls=urls)
+        responses: List[bytes] = self._get(urls=urls, extensions={"force_cache": True})
         df = pd.DataFrame()
         for response in responses:
             as_json = json.loads(response.decode())
@@ -205,6 +208,8 @@ class BioDBNet(BaseModel, FastHTTP):
         logger.debug("Databases are valid")
         databases: list[str] = [d.value.replace(" ", "").lower() for d in db_path]
 
+        input_values.sort()
+        databases.sort()
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=dbwalk&format=row")
@@ -244,9 +249,10 @@ class BioDBNet(BaseModel, FastHTTP):
     ) -> pd.DataFrame:
         if isinstance(output_db, Output):
             output_db = [output_db]
-
         taxon_id = self._validate_taxon_id(taxon)[0]
 
+        output_db.sort()
+        input_values.sort()
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
@@ -273,10 +279,11 @@ class BioDBNet(BaseModel, FastHTTP):
     ):
         input_taxon_value = self._validate_taxon_id(input_taxon)[0]
         output_taxon_value = self._validate_taxon_id(output_taxon)[0]
-
         if isinstance(output_db, Output):
             output_db = [output_db]
 
+        output_db.sort()
+        input_values.sort()
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
@@ -321,14 +328,15 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)[0]
+        annotations = [a.replace(" ", "").lower() for a in sorted(annotations)]
 
-        annotations_ = [a.replace(" ", "").lower() for a in annotations]
+        input_values.sort()
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=dbannot")
             urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
-            urls[-1] += f"&annotations={','.join(annotations_)}"
+            urls[-1] += f"&annotations={','.join(annotations)}"
             urls[-1] += "&format=row"
 
         responses: list[bytes] = self._get(urls=urls)
@@ -346,7 +354,6 @@ class BioDBNet(BaseModel, FastHTTP):
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)
-
         input_db_val = input_db.value.replace(" ", "_")
         output_db_val = output_db.value.replace(" ", "_")
 
@@ -356,9 +363,9 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("/Users/joshl/Downloads/A.csv", index_col=0)
+    df = pd.read_csv("/Users/joshl/Downloads/A.csv", index_col=0, nrows=250)
 
-    biodbnet = BioDBNet(cache=True)
+    biodbnet = BioDBNet(cache=False)
     result = biodbnet.db2db(
         input_values=df.index.tolist(),
         input_db=Input.GENE_SYMBOL,
