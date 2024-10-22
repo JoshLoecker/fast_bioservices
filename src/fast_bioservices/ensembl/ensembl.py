@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from typing import List
 
 from fast_bioservices.base import BaseModel
@@ -43,12 +43,11 @@ class Ensembl(BaseModel, FastHTTP):
         return self._url
 
     def __get_species(self) -> List[Species]:
-        path = self._url + "/info/species"
+        path = f"{self._url}/info/species"
         response = self._get(path, headers={"Content-Type": "application/json"})
         species: list[Species] = []
         as_json = json.loads(response[0].decode())
-        for item in as_json["species"]:
-            species.append(Species(**item))
+        species.extend(Species(**item) for item in as_json["species"])
         return species
 
     def _match_species(self, species: str) -> Species | None:
