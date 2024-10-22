@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 import json
-from typing import List, Literal, Optional, Union
+from typing import List, Literal
 
 from fast_bioservices.ensembl.ensembl import Ensembl
 from fast_bioservices.settings import default_workers
@@ -72,7 +74,7 @@ class GetHomology(Ensembl):
     def by_species_with_symbol_or_id(
         self,
         reference_species: str,
-        ensembl_id_or_symbol: Union[str, List[str]],
+        ensembl_id_or_symbol: str | List[str],
         aligned: bool = True,
         cigar_line: bool = True,
         compara: str = "vertebrates",
@@ -80,7 +82,7 @@ class GetHomology(Ensembl):
         format: Literal["full", "condensed"] = "full",
         sequence: Literal["none", "cdna", "protein"] = "protein",
         target_species: str = "",
-        target_taxon: Optional[int] = None,
+        target_taxon: int | None = None,
         type: Literal["orthologues", "paralogues", "projections", "all"] = "all",
     ) -> List[HomologyResult]:
         ensembl_id_or_symbol = [ensembl_id_or_symbol] if isinstance(ensembl_id_or_symbol, str) else ensembl_id_or_symbol

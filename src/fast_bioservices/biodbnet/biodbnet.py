@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import io
 import json
-from typing import Dict, List, Literal, Union
+from typing import Dict, List, Literal
 
 import pandas as pd
 from loguru import logger
@@ -25,8 +27,8 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def _are_nodes_valid(
         self,
-        input_: Union[Input, Output],
-        output: Union[Input, Output, List[Input], List[Output]],
+        input_: Input | Output,
+        output: Input | Output | List[Input | Output],
         direct_output: bool = False,
     ) -> bool:
         """
@@ -34,9 +36,9 @@ class BioDBNet(BaseModel, FastHTTP):
 
         Parameters
         ----------
-        input_ : Union[Input, Output]
+        input_ : Input | Output
             The input database
-        output : Union[Input, Output, List[Input], List[Output]]
+        output : Input | Output | List[Input | Output]
             The output database
         direct_output : bool, optional
             Get direct output node(s) for a given input node (i.e., outputs reacable by a single connection), by default False
@@ -56,7 +58,7 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def _validate_taxon_id(
         self,
-        taxon: Union[int, Taxon, List[Union[int, Taxon]]],
+        taxon: int | str | Taxon | list[int | str | Taxon],
     ) -> List[int]:
         taxon_list: list[int] = []
 
@@ -64,44 +66,53 @@ class BioDBNet(BaseModel, FastHTTP):
             taxon_list.append(taxon.value)
         elif isinstance(taxon, int):
             taxon_list.append(taxon)
+        elif isinstance(taxon, str):
+            logger.warning(f"The provided taxon ID ('{taxon}') is a string, attempting to map it to a known integer value...")
+            taxon_list.append(Taxon.string_to_obj(taxon).value)
         elif isinstance(taxon, list):
             for t in taxon:
                 if isinstance(t, Taxon):
                     taxon_list.append(t.value)
                 elif isinstance(t, int):
                     taxon_list.append(t)
+                elif isinstance(t, str):
+                    logger.warning(f"The provided taxon ID ('{t}') is a string, attempting to map it to a known integer value...")
+                    taxon_list.append(Taxon.string_to_obj(t).value)
+        else:
+            raise ValueError(f"Unknown taxon type for '{taxon}': {type(taxon)}")
 
         for t in taxon_list:
             logger.debug(f"Validating taxon ID '{t}'")
-            taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-            if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, temp_disable_progress=True)[0]):
-                raise ValueError(f"Unable to find taxon '{t}'")
-        logger.debug(f"Taxon IDs are valid: {','.join([str(i) for i in taxon_list])}")
+            if t not in Taxon.member_values():  # All items in the 'Taxon' enum are valid, only need to check items not in enum
+                taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
+                if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)[0]):
+                    raise ValueError(f"Unable to find taxon '{t}'")
+        logger.debug(f"Taxon IDs are valid: '{','.join([str(i) for i in taxon_list])}'")
 
         return taxon_list
 
-    def getDirectOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
+    def getDirectOutputsForInput(self, input: Input | Output) -> List[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={input.value.replace(' ', '').lower()}&directOutput=1"
-        outputs = self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0]
+        outputs = self._get(url, temp_disable_cache=True, log_on_complete=False)[0]
         as_json = json.loads(outputs)
         return as_json["output"]
 
     def getInputs(self) -> List[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0]
+        inputs = self._get(url, temp_disable_cache=True, log_on_complete=False)[0]
         as_json = json.loads(inputs)
         return as_json["input"]
 
-    def getOutputsForInput(self, input: Union[Input, Output]) -> List[str]:
+    def getOutputsForInput(self, input: Input | Output) -> List[str]:
         url = f"{self.url}?method=getoutputsforinput&input={input.value.replace(' ', '').lower()}"
-        valid_outputs = json.loads(self._get(url, temp_disable_cache=True, temp_disable_progress=True)[0].decode())
+        valid_outputs = json.loads(self._get(url, temp_disable_cache=True, log_on_complete=False)[0].decode())
         return valid_outputs["output"]
 
     def getAllPathways(
         self,
-        taxon: Union[Taxon, int],
+        taxon: Taxon | int,
         as_dataframe: bool = False,
-    ) -> Union[pd.DataFrame, List[Dict[str, str]]]:
+    ) -> pd.DataFrame | List[Dict[str, str]]:
         taxon_id = self._validate_taxon_id(taxon)[0]
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
@@ -112,19 +123,16 @@ class BioDBNet(BaseModel, FastHTTP):
 
     def getPathwayFromDatabase(
         self,
-        pathways: Union[
-            Literal["reactome", "biocarta", "ncipid", "kegg"],
-            List[Literal["reactome", "biocarta", "ncipid", "kegg"]],
-        ],
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        pathways: Literal["reactome", "biocarta", "ncipid", "kegg"] | List[Literal["reactome", "biocarta", "ncipid", "kegg"]],
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
         as_dataframe: bool = True,
-    ) -> Union[pd.DataFrame, List[Dict[str, str]]]:
+    ) -> pd.DataFrame | List[Dict[str, str]]:
         taxon_id = self._validate_taxon_id(taxon)[0]
 
         if isinstance(pathways, str):
             pathways = [pathways]
 
-        url = f"{self.url}?method=getpathways&pathways={','.join(pathways)}&taxonId={taxon_id}"
+        url = f"{self.url}?method=getpathways&pathways={','.join(sorted(pathways))}&taxonId={taxon_id}"
         as_json = json.loads(self._get(url)[0].decode())
 
         if as_dataframe:
@@ -135,10 +143,11 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         input_values: List[str],
         input_db: Input,
-        output_db: Union[Output, List[Output]],
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        output_db: Output | List[Output],
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)[0]
+
         if not self._are_nodes_valid(input_db, output_db):
             out_db: list = [output_db] if not isinstance(output_db, list) else output_db
             raise ValueError(
@@ -150,21 +159,27 @@ class BioDBNet(BaseModel, FastHTTP):
         logger.debug("Databases are valid")
 
         if isinstance(output_db, Output):
-            output_db_value = output_db.value
+            output_db_value = output_db.value.lower().replace(" ", "")
         else:
-            output_db_value = ",".join([o.value for o in output_db])
-        logger.debug(f"Got an input database with a value of '{input_db.value}'")
+            output_db_value = ",".join(sorted([o.value.lower().replace(" ", "") for o in output_db]))
+        logger.debug(f"Got an input database with a value of '{input_db.value.lower().replace(' ', '')}'")
         logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
+        # https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi?method=db2db
+
+        input_values.sort()
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
-            urls.append(self.url + "?method=db2db&format=row")
-            urls[-1] += f"&input={input_db.value}"
-            urls[-1] += f"&outputs={output_db_value}"
-            urls[-1] += f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
-            urls[-1] += f"&taxonId={taxon_id}"
+            urls.append(
+                f"{self.url}?method=db2db"
+                f"&format=row"
+                f"&input={input_db.value.lower().replace(' ', '')}"
+                f"&outputs={output_db_value}"
+                f"&inputValues={','.join(input_values[i: i + self._chunk_size])}"
+                f"&taxonId={taxon_id}"
+            )
 
-        responses: List[bytes] = self._get(urls=urls)
+        responses: List[bytes] = self._get(urls=urls, extensions={"force_cache": True})
         df = pd.DataFrame()
         for response in responses:
             as_json = json.loads(response.decode())
@@ -177,8 +192,8 @@ class BioDBNet(BaseModel, FastHTTP):
     def dbWalk(
         self,
         input_values: List[str],
-        db_path: List[Union[Input, Output]],
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        db_path: List[Input | Output],
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)[0]
 
@@ -193,6 +208,8 @@ class BioDBNet(BaseModel, FastHTTP):
         logger.debug("Databases are valid")
         databases: list[str] = [d.value.replace(" ", "").lower() for d in db_path]
 
+        input_values.sort()
+        databases.sort()
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=dbwalk&format=row")
@@ -212,8 +229,8 @@ class BioDBNet(BaseModel, FastHTTP):
     def dbReport(
         self,
         input_values: List[str],
-        input_db: Union[Input, Output],
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        input_db: Input | Output,
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ):
         return NotImplementedError
         taxon_id = self._validate_taxon_id(taxon)[0]
@@ -227,14 +244,15 @@ class BioDBNet(BaseModel, FastHTTP):
     def dbFind(
         self,
         input_values: List[str],
-        output_db: Union[Output, List[Output]],
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        output_db: Output | List[Output],
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         if isinstance(output_db, Output):
             output_db = [output_db]
-
         taxon_id = self._validate_taxon_id(taxon)[0]
 
+        output_db.sort()
+        input_values.sort()
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
@@ -255,16 +273,17 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         input_values: List[str],
         input_db: Input,
-        output_db: Union[Output, List[Output]],
-        input_taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
-        output_taxon: Union[Taxon, int] = Taxon.MUS_MUSCULUS,
+        output_db: Output | List[Output],
+        input_taxon: Taxon | int = Taxon.HOMO_SAPIENS,
+        output_taxon: Taxon | int = Taxon.MUS_MUSCULUS,
     ):
         input_taxon_value = self._validate_taxon_id(input_taxon)[0]
         output_taxon_value = self._validate_taxon_id(output_taxon)[0]
-
         if isinstance(output_db, Output):
             output_db = [output_db]
 
+        output_db.sort()
+        input_values.sort()
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(input_values), self._chunk_size):
@@ -306,17 +325,18 @@ class BioDBNet(BaseModel, FastHTTP):
                 "Protein Interactors",
             ]
         ],
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)[0]
+        annotations = [a.replace(" ", "").lower() for a in sorted(annotations)]
 
-        annotations_ = [a.replace(" ", "").lower() for a in annotations]
+        input_values.sort()
         urls: list[str] = []
         for i in range(0, len(input_values), self._chunk_size):
             urls.append(self.url + "?method=dbannot")
             urls[-1] += f"&inputValues={','.join(input_values[i:i + self._chunk_size])}"
             urls[-1] += f"&taxonId={taxon_id}"
-            urls[-1] += f"&annotations={','.join(annotations_)}"
+            urls[-1] += f"&annotations={','.join(annotations)}"
             urls[-1] += "&format=row"
 
         responses: list[bytes] = self._get(urls=urls)
@@ -331,10 +351,9 @@ class BioDBNet(BaseModel, FastHTTP):
         self,
         input_db: Input,
         output_db: Output,
-        taxon: Union[Taxon, int] = Taxon.HOMO_SAPIENS,
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
         taxon_id = self._validate_taxon_id(taxon)
-
         input_db_val = input_db.value.replace(" ", "_")
         output_db_val = output_db.value.replace(" ", "_")
 
@@ -344,20 +363,12 @@ class BioDBNet(BaseModel, FastHTTP):
 
 
 if __name__ == "__main__":
-
-    def gene_ids() -> list[str]:
-        return ["4318", "1376", "2576", "10089"]
-
-    def gene_symbols() -> list[str]:
-        return ["MMP9", "CPT2", "GAGE4", "KCNK7"]
-
-    import sys
-
-    from loguru import logger
-
-    logger.remove()
-    logger.add(sys.stderr, level="TRACE")
+    df = pd.read_csv("/Users/joshl/Downloads/A.csv", index_col=0, nrows=250)
 
     biodbnet = BioDBNet(cache=False)
-    result = biodbnet.dbFind(input_values=gene_ids(), output_db=Output.GENE_SYMBOL)
+    result = biodbnet.db2db(
+        input_values=df.index.tolist(),
+        input_db=Input.GENE_SYMBOL,
+        output_db=[Output.ENSEMBL_GENE_ID, Output.GENE_ID, Output.CHROMOSOMAL_LOCATION],
+    )
     print(result)
