@@ -1,4 +1,4 @@
-from enum import Enum, member
+from enum import Enum
 
 from loguru import logger
 
