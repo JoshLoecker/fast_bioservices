@@ -1,4 +1,5 @@
-from enum import Enum
+from enum import Enum, member
+
 from loguru import logger
 
 
@@ -13,6 +14,7 @@ class Taxon(Enum):
     ESCHERICHIA_COLI = 562
     HEPACIVIRUS_HOMINIS = 3052230
     HOMO_SAPIENS = 9606
+    MACACA_MULATTA = 9544
     MUS_MUSCULUS = 10090
     MYCOPLASMOIDES_PNEUMONIAE = 2104
     ORYZA_SATIVA = 4530
@@ -27,7 +29,8 @@ class Taxon(Enum):
 
     @classmethod
     def member_values(cls) -> list[int]:
-        return list(cls.__members__.values())
+        member_values: list[Taxon] = list(cls.__members__.values())
+        return [i.value for i in member_values]
 
     @classmethod
     def from_int(cls, n: int) -> "Taxon":
