@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import json
-from typing import Any, Literal, Mapping, Optional
+from typing import Any, Literal, Mapping
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.fast_http import FastHTTP
@@ -24,13 +26,11 @@ class BiGG(BaseModel, FastHTTP):
 
     def version(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/database_version", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def models(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/models", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def model_details(
         self,
@@ -38,8 +38,7 @@ class BiGG(BaseModel, FastHTTP):
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/models/{model_id}", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def json(
         self,
@@ -47,14 +46,13 @@ class BiGG(BaseModel, FastHTTP):
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/models/{model_id}/download", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def download(
         self,
         model_id: str,
         format: Literal["json", "xml", "mat", "json.gz", "xml.gz", "mat.gz"],
-        download_path: Optional[str] = None,
+        download_path: str | None = None,
         temp_disable_cache: bool = False,
     ) -> None:
         if download_path is None:
@@ -76,8 +74,7 @@ class BiGG(BaseModel, FastHTTP):
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/models/{model_id}/reactions", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def model_reaction_details(
         self,
@@ -89,8 +86,7 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/models/{model_id}/reactions/{reaction_id}",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def model_metabolites(
         self,
@@ -101,8 +97,7 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/models/{model_id}/metabolites",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def model_metabolite_details(
         self,
@@ -114,8 +109,7 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/models/{model_id}/metabolites/{metabolite_id}",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def model_genes(
         self,
@@ -123,8 +117,7 @@ class BiGG(BaseModel, FastHTTP):
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/models/{model_id}/genes", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def model_gene_details(
         self,
@@ -136,13 +129,11 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/models/{model_id}/genes/{gene_id}",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def universal_reactions(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/universal/reactions", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def universal_reaction_details(
         self,
@@ -153,13 +144,11 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/universal/reactions/{reaction_id}",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def universal_metabolites(self, temp_disable_cache: bool = False) -> Mapping[Any, Any]:
         response = self._get(f"{self.url}/universal/metabolites", temp_disable_cache=temp_disable_cache)[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def universal_metabolite_details(
         self,
@@ -170,8 +159,7 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/universal/metabolites/{metabolite_id}",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)
 
     def search(
         self,
@@ -183,5 +171,4 @@ class BiGG(BaseModel, FastHTTP):
             f"{self.url}/search?query={query}&search_type={search_type}",
             temp_disable_cache=temp_disable_cache,
         )[0]
-        as_json = json.loads(response)
-        return as_json
+        return json.loads(response)

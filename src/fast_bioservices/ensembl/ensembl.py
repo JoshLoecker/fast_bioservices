@@ -1,6 +1,8 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
 import json
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import List
 
 from fast_bioservices.base import BaseModel
 from fast_bioservices.fast_http import FastHTTP
@@ -41,15 +43,14 @@ class Ensembl(BaseModel, FastHTTP):
         return self._url
 
     def __get_species(self) -> List[Species]:
-        path = self._url + "/info/species"
+        path = f"{self._url}/info/species"
         response = self._get(path, headers={"Content-Type": "application/json"})
         species: list[Species] = []
         as_json = json.loads(response[0].decode())
-        for item in as_json["species"]:
-            species.append(Species(**item))
+        species.extend(Species(**item) for item in as_json["species"])
         return species
 
-    def _match_species(self, species: str) -> Optional[Species]:
+    def _match_species(self, species: str) -> Species | None:
         """
         This function will make sure the user enters a valid species name
         It will do this by collecting all the species names from the Ensembl API
