@@ -24,6 +24,15 @@ class Taxon(int, Enum):
     XENOPUS_LAEVIS = 8355
     ZEA_MAYS = 4577
 
+    @staticmethod
+    def from_string(value: str) -> "Taxon":
+        if value.lower() in {"human", "humans", "homo sapiens"}:
+            return Taxon.HOMO_SAPIENS
+        elif value.lower() in {"mouse", "mus musculus"}:
+            return Taxon.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Unknown taxon: '{value}'")
+
 
 class Input(str, Enum):
     """

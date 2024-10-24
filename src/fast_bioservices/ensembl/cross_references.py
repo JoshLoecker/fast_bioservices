@@ -1,9 +1,8 @@
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl, Species
-from fast_bioservices.settings import default_workers
 
 
 @dataclass(frozen=True)
@@ -31,10 +30,8 @@ class ExternalReference:
 
 
 class CrossReference(Ensembl):
-    def __init__(self, max_workers: int = default_workers, cache: bool = True):
-        self._max_workers: int = max_workers
-
-        super().__init__(max_workers=self._max_workers, cache=cache)
+    def __init__(self, cache: bool = True):
+        super().__init__(cache=cache)
 
     def get_ensembl_from_external(
         self,
@@ -101,7 +98,7 @@ class CrossReference(Ensembl):
 
 
 def main():
-    c = CrossReference(max_workers=1)
+    c = CrossReference()
 
     r = c.get_ensembl_from_external("human", ["GOLT1A", "GOLT1B"])
     print(r)

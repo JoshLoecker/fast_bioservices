@@ -1,10 +1,8 @@
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from typing import List, Optional
 
-from fast_bioservices.base import BaseModel
 from fast_bioservices.fast_http import FastHTTP
-from fast_bioservices.settings import default_workers
 from fast_bioservices.utils import fuzzy_search
 
 
@@ -30,23 +28,21 @@ class FuzzyResult:
     score: float
 
 
-class Ensembl(BaseModel, FastHTTP):
-    def __init__(self, max_workers: int = default_workers, cache: bool = True):
+class Ensembl(FastHTTP):
+    def __init__(self, cache: bool = True):
         self._url = "https://rest.ensembl.org"
-        BaseModel.__init__(self, url=self._url)
-        FastHTTP.__init__(self, cache=cache, workers=max_workers, max_requests_per_second=15)
+        FastHTTP.__init__(self, cache=cache, max_requests_per_second=15)
 
     @property
     def url(self) -> str:
         return self._url
 
     def __get_species(self) -> List[Species]:
-        path = self._url + "/info/species"
+        path = f"{self._url}/info/species"
         response = self._get(path, headers={"Content-Type": "application/json"})
         species: list[Species] = []
         as_json = json.loads(response[0].decode())
-        for item in as_json["species"]:
-            species.append(Species(**item))
+        species.extend(Species(**item) for item in as_json["species"])
         return species
 
     def _match_species(self, species: str) -> Optional[Species]:
@@ -82,7 +78,7 @@ class Ensembl(BaseModel, FastHTTP):
 
 
 def main():
-    e = Ensembl(max_workers=1)
+    e = Ensembl()
     e._match_species("human")
 
 

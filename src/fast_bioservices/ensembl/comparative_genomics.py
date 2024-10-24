@@ -1,9 +1,8 @@
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from typing import List, Literal, Optional, Union
 
 from fast_bioservices.ensembl.ensembl import Ensembl
-from fast_bioservices.settings import default_workers
 
 
 @dataclass
@@ -42,20 +41,20 @@ class HomologyResult:
 
 
 class GetCafeTree(Ensembl):
-    def __init__(self, *, max_workers: int = default_workers, cache: bool = True):
-        super().__init__(max_workers=max_workers, cache=cache)
+    def __init__(self, *, cache: bool = True):
+        super().__init__(cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
 class GetGeneTree(Ensembl):
-    def __init__(self, *, max_workers: int = default_workers, cache: bool = True):
-        super().__init__(max_workers=max_workers, cache=cache)
+    def __init__(self, *, cache: bool = True):
+        super().__init__(cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
 class GetAlignment(Ensembl):
-    def __init__(self, *, max_workers: int = default_workers, cache: bool = True):
-        super().__init__(max_workers=max_workers, cache=cache)
+    def __init__(self, *, cache: bool = True):
+        super().__init__(cache=cache)
         raise NotImplementedError("Not implemented yet")
 
 
@@ -63,7 +62,7 @@ class GetHomology(Ensembl):
     def __init__(self, max_workers: int = 4, cache: bool = True):
         self._max_workers: int = max_workers
 
-        super().__init__(max_workers=self._max_workers, cache=cache)
+        super().__init__(cache=cache)
 
     @property
     def url(self) -> str:
