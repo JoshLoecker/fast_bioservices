@@ -6,7 +6,6 @@ import sys
 import time
 import urllib.parse
 from abc import ABC
-from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 import hishel
@@ -157,8 +156,3 @@ class FastHTTP(ABC):
                 responses += self._loop.run_until_complete(asyncio.gather(*chunk))
 
         return responses
-
-
-if __name__ == "__main__":
-    x = FastHTTP(cache=True, max_requests_per_second=1)
-    x._get(["https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json?method=getoutputsforinput&input=ensemblgeneid"])
