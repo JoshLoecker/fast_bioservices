@@ -87,7 +87,7 @@ class FastHTTP(ABC):
             self._transport = hishel.AsyncCacheTransport(transport=transport, storage=self._storage, controller=self._controller)
         else:
             self._transport = transport
-        self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=60)
+        self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
 
         self._current_requests: int = 0
         self._total_requests: int = 0
@@ -112,7 +112,7 @@ class FastHTTP(ABC):
     async def _do_get(self, url: str, headers: dict, extensions: dict, log_on_complete: bool) -> bytes:
         try:
             async with self._transport:
-                response: httpx.Response = await self._client.get(url, headers=headers, timeout=60, extensions=extensions)
+                response: httpx.Response = await self._client.get(url, headers=headers, extensions=extensions)
         except httpx.ReadTimeout as e:
             logger.critical(f"Read timeout error on url: {url}")
             raise e
@@ -124,7 +124,7 @@ class FastHTTP(ABC):
             raise e
 
         if log_on_complete:
-            if response.extensions["from_cache"]:
+            if "from_cache" in response.extensions and response.extensions["from_cache"]:
                 self._log_on_complete_callback(cached=True)
             else:
                 self._log_on_complete_callback(cached=False)
