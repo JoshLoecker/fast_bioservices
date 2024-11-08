@@ -1,28 +1,29 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
-from typing import Dict, List, Literal
+from typing import Literal
 
 import pandas as pd
 from loguru import logger
 
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import FastHTTP
+from fast_bioservices.fast_http import AsyncHTTPClient
 
 
-class BioDBNet(FastHTTP):
-    def __init__(self, cache: bool = True):
+class BioDBNet(AsyncHTTPClient):
+    def __init__(self, cache: bool = True, chunk_size: int = 250):
+        super().__init__(cache=cache, max_requests_per_second=10)
         self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
-        self._chunk_size: int = 250
-
-        FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
+        self._cache: bool = cache
+        self._chunk_size: int = chunk_size
 
     @property
     def url(self) -> str:
         return self._url
 
-    def _are_nodes_valid(self, value: Input | Output, to: Input | Output | List[Input | Output], direct_output: bool = False) -> bool:
+    async def _are_nodes_valid(self, value: Input | Output, to: Input | Output | list[Input | Output], direct_output: bool = False) -> bool:
         """
         The input database and output database must be different.
 
@@ -30,7 +31,7 @@ class BioDBNet(FastHTTP):
         ----------
         value : Input | Output
             The input database
-        to : Input | Output | List[Input | Output]
+        to : Input | Output | list[Input | Output]
             The output database
         direct_output : bool, optional
             Get direct output node(s) for a given input node (i.e., outputs reacable by a single connection), by default False
@@ -45,10 +46,10 @@ class BioDBNet(FastHTTP):
         output_list = to if isinstance(to, list) else [to]
 
         if direct_output:
-            return all(o.value in self.getDirectOutputsForInput(value) for o in output_list)
-        return all(o.value in self.getOutputsForInput(value) for o in output_list)
+            return all([o.value in await self.get_direct_outputs_for_input(value) for o in output_list])
+        return all([o.value in await self.get_outputs_for_input(value) for o in output_list])
 
-    def _validate_taxon_id(self, taxon: int | str | Taxon | list[int | str | Taxon]) -> List[int]:
+    async def _validate_taxon_id(self, taxon: int | str | Taxon | list[int | str | Taxon]) -> list[int]:
         taxon_list: list[int] = []
 
         if isinstance(taxon, Taxon):
@@ -72,64 +73,85 @@ class BioDBNet(FastHTTP):
 
         for t in taxon_list:
             logger.debug(f"Validating taxon ID '{t}'")
-            if t not in Taxon:  # All items in the 'Taxon' enum are valid, only need to check items not in enum
+            if t not in Taxon.values():  # All items in the 'Taxon' enum are valid, only need to check items not in enum
                 taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-                if "No items found." in str(self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)[0]):
+                response = await self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)
+                if "No items found." in str(response[0]):
                     raise ValueError(f"Unable to find taxon '{t}'")
         logger.debug(f"Taxon IDs are valid: '{','.join([str(i) for i in taxon_list])}'")
 
         return taxon_list
 
-    def getDirectOutputsForInput(self, value: Input | Output) -> List[str]:
+    async def get_direct_outputs_for_input(self, value: Input | Output) -> list[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={value.value.replace(' ', '').lower()}&directOutput=1"
-        outputs = self._get(url, temp_disable_cache=True, log_on_complete=False)[0]
+        outputs = (await self._get(url, temp_disable_cache=True, log_on_complete=False))[0]
         as_json = json.loads(outputs)
         return as_json["output"]
 
-    def getInputs(self) -> List[str]:
+    async def get_inputs(self) -> list[str]:
         url = f"{self.url}?method=getinputs"
-        inputs = self._get(url, temp_disable_cache=True, log_on_complete=False)[0]
+        inputs = (await self._get(url, temp_disable_cache=True, log_on_complete=False))[0]
         as_json = json.loads(inputs)
         return as_json["input"]
 
-    def getOutputsForInput(self, value: Input | Output) -> List[str]:
+    async def get_outputs_for_input(self, value: Input | Output) -> list[str]:
         url = f"{self.url}?method=getoutputsforinput&input={value.value.replace(' ', '').lower()}"
-        valid_outputs = json.loads(self._get(url, temp_disable_cache=True, log_on_complete=False)[0].decode())
+        response = (await self._get(url, temp_disable_cache=True, log_on_complete=False))[0].decode()
+        valid_outputs = json.loads(response)
         return valid_outputs["output"]
 
-    def getAllPathways(self, taxon: Taxon | int, as_dataframe: bool = False) -> pd.DataFrame | List[Dict[str, str]]:
-        taxon_id = self._validate_taxon_id(taxon)[0]
+    async def get_all_pathways(self, taxon: Taxon | int, as_dataframe: bool = False) -> pd.DataFrame | list[dict[str, str]]:
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
-        as_json = json.loads(self._get(url)[0].decode())
+        response = (await self._get(url))[0].decode()
+        as_json = json.loads(response)
         return pd.DataFrame(as_json) if as_dataframe else as_json
 
-    def getPathwayFromDatabase(
+    async def get_pathway_from_database(
         self,
-        pathways: Literal["reactome", "biocarta", "ncipid", "kegg"] | List[Literal["reactome", "biocarta", "ncipid", "kegg"]],
+        pathways: Literal["reactome", "biocarta", "ncipid", "kegg"] | list[Literal["reactome", "biocarta", "ncipid", "kegg"]],
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
         as_dataframe: bool = True,
-    ) -> pd.DataFrame | List[Dict[str, str]]:
-        taxon_id = self._validate_taxon_id(taxon)[0]
+    ) -> pd.DataFrame | list[dict[str, str]]:
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
 
         if isinstance(pathways, str):
             pathways = [pathways]
 
         url = f"{self.url}?method=getpathways&pathways={','.join(sorted(pathways))}&taxonId={taxon_id}"
-        as_json = json.loads(self._get(url)[0].decode())
-
+        response = (await self._get(url))[0].decode()
+        as_json = json.loads(response)
         return pd.DataFrame(as_json) if as_dataframe else as_json
+
+    async def async_db2db(
+        self,
+        values: list[str],
+        input_db: Input,
+        output_db: Output | list[Output],
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
+    ):
+        return await self._db2db(values=values, input_db=input_db, output_db=output_db, taxon=taxon)
 
     def db2db(
         self,
-        values: List[str],
+        values: list[str],
         input_db: Input,
-        output_db: Output | List[Output],
+        output_db: Output | list[Output],
+        taxon: Taxon | int = Taxon.HOMO_SAPIENS,
+    ):
+        return asyncio.run(self._db2db(values=values, input_db=input_db, output_db=output_db, taxon=taxon))
+
+    async def _db2db(
+        self,
+        values: list[str],
+        input_db: Input,
+        output_db: Output | list[Output],
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)[0]
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
 
-        if not self._are_nodes_valid(input_db, output_db):
+        if not await self._are_nodes_valid(input_db, output_db):
             out_db: list = output_db if isinstance(output_db, list) else [output_db]
             raise ValueError(
                 "You have provided an invalid output database(s).\n"
@@ -146,25 +168,20 @@ class BioDBNet(FastHTTP):
         logger.debug(f"Got an input database with a value of '{input_db.value.lower().replace(' ', '')}'")
         logger.debug(f"Got {len(output_db_value.split(','))} output databases with values of: '{output_db_value}'")
 
-        # https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi?method=db2db
-
         values.sort()
         urls: list[str] = [
             f"{self.url}?method=db2db&format=row&input={input_db.value.lower().replace(' ', '')}&outputs={output_db_value}&inputValues={','.join(values[i:i + self._chunk_size])}&taxonId={taxon_id}"
             for i in range(0, len(values), self._chunk_size)
         ]
-        responses: List[bytes] = self._get(urls=urls, extensions={"force_cache": True})
-        df = pd.DataFrame()
-        for response in responses:
-            as_json = json.loads(response.decode())
-            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
-
-        df.rename(columns={"InputValue": input_db.value}, inplace=True)
+        responses: list[str] = [
+            item for response in await self._get(urls=urls, extensions={"force_cache": True}) for item in json.loads(response.decode())
+        ]
+        df = pd.DataFrame(responses).rename(columns={"InputValue": input_db.value})
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df
 
-    def dbWalk(self, values: List[str], db_path: List[Input | Output], taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)[0]
+    async def db_walk(self, values: list[str], db_path: list[Input | Output], taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
 
         for i in range(len(db_path) - 1):
             current_db = db_path[i]
@@ -181,63 +198,64 @@ class BioDBNet(FastHTTP):
         databases.sort()
         urls: list[str] = []
         for i in range(0, len(values), self._chunk_size):
-            urls.append(self.url + "?method=dbwalk&format=row")
-            urls[-1] += f"&inputValues={','.join(values[i:i + self._chunk_size])}"
-            urls[-1] += f"&dbPath={'->'.join(databases)}"
-            urls[-1] += f"&taxonId={taxon_id}"
+            urls.append(
+                f"{self.url}?method=dbwalk&"
+                f"format=row&"
+                f"inputValues={','.join(values[i:i + self._chunk_size])}&"
+                f"dbPath={'->'.join(databases)}&"
+                f"taxonId={taxon_id}"
+            )
 
-        responses: List[bytes] = self._get(urls)
-        df = pd.DataFrame()
-        for response in responses:
-            as_json = json.loads(response.decode())
-            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
-        df = df.rename(columns={"InputValue": str(db_path[0].value)})
+        responses: list[bytes] = [item for response in await self._get(urls) for item in json.loads(response)]
+        df = pd.DataFrame(responses).rename(columns={"InputValue": str(db_path[0].value)})
         logger.debug(f"Returning dataframe with {len(df)} rows")
         return df
 
-    def dbReport(self, values: List[str], input_db: Input | Output, taxon: Taxon | int = Taxon.HOMO_SAPIENS):
-        # taxon_id = self._validate_taxon_id(taxon)[0]
-        # urls: list[str] = []
-        # for i in range(0, len(values), self._chunk_size):
-        #     urls.append(self.url + "?method=dbreport&format=row")
-        #     urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
-        #     urls[-1] += f"inputValues={','.join(values[i:i + self._chunk_size])}"
-        #     urls[-1] += f"&taxonId={taxon_id}"
+    async def db_report(self, values: list[str], input_db: Input | Output, taxon: Taxon | int = Taxon.HOMO_SAPIENS):
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
+        urls: list[str] = []
+        for i in range(0, len(values), self._chunk_size):
+            urls.append(
+                f"{self.url}?method=dbreport&"
+                f"format=row&"
+                f"input={input_db.value.replace(' ', '').lower()}&"
+                f"inputValues={','.join(values[i:i + self._chunk_size])}&"
+                f"taxonId={taxon_id}"
+            )
         return NotImplementedError
 
-    def dbFind(self, values: List[str], output_db: Output | List[Output], taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
-        if isinstance(output_db, Output):
-            output_db = [output_db]
-        taxon_id = self._validate_taxon_id(taxon)[0]
-
-        output_db.sort()
-        values.sort()
+    async def db_find(self, values: list[str], output_db: Output | list[Output], taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
+        values = sorted(values)
         urls: list[str] = []
+        output_db: list[Output] = [output_db] if isinstance(output_db, Output) else output_db
+
         for out_db in output_db:
             for i in range(0, len(values), self._chunk_size):
-                urls.append(self.url + "?method=dbfind&format=row")
-                urls[-1] += f"&inputValues={','.join(values[i:i + self._chunk_size])}"
-                urls[-1] += f"&output={out_db.value}"
-                urls[-1] += f"&taxonId={taxon_id}"
-
-        responses: List[bytes] = self._get(urls=urls)
-        df = pd.DataFrame()
-        for response in responses:
-            as_json = json.loads(response.decode())
-            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
-        # df.rename(columns={"InputValue": input_db.value}, inplace=True)
+                urls.append(
+                    f"{self.url}?method=dbfind&"
+                    f"format=row&"
+                    f"inputValues={','.join(values[i:i + self._chunk_size])}&"
+                    f"output={out_db.value.lower().replace(' ', '')}&taxonId={taxon_id}"
+                )
+        all_responses = []
+        for response in await self._get(urls=urls):
+            all_responses.extend(json.loads(response.decode()))
+        df = pd.DataFrame(all_responses).groupby("InputValue", as_index=False).first()
         return df
 
-    def dbOrtho(
+    async def db_ortho(
         self,
-        values: List[str],
+        values: list[str],
         input_db: Input,
-        output_db: Output | List[Output],
+        output_db: Output | list[Output],
         input_taxon: Taxon | int = Taxon.HOMO_SAPIENS,
         output_taxon: Taxon | int = Taxon.MUS_MUSCULUS,
     ):
-        input_taxon_value = self._validate_taxon_id(input_taxon)[0]
-        output_taxon_value = self._validate_taxon_id(output_taxon)[0]
+        input_taxon_value, output_taxon_value = await asyncio.gather(*[self._validate_taxon_id(input_taxon), self._validate_taxon_id(output_taxon)])
+        input_taxon_value = input_taxon_value[0]
+        output_taxon_value = output_taxon_value[0]
+
         if isinstance(output_db, Output):
             output_db = [output_db]
 
@@ -246,19 +264,18 @@ class BioDBNet(FastHTTP):
         urls: list[str] = []
         for out_db in output_db:
             for i in range(0, len(values), self._chunk_size):
-                urls.append(self.url + "?method=dbortho")
-                urls[-1] += f"&input={input_db.value.replace(' ', '').lower()}"
-                urls[-1] += f"&inputValues={','.join(values[i:i + self._chunk_size])}"
-                urls[-1] += f"&inputTaxon={input_taxon_value}"
-                urls[-1] += f"&outputTaxon={output_taxon_value}"
-                urls[-1] += f"&output={out_db.value.replace(' ', '').lower()}"
-                urls[-1] += "&format=row"
+                urls.append(
+                    f"{self.url}?method=dbortho&"
+                    f"input={input_db.value.replace(' ', '').lower()}&"
+                    f"inputValues={','.join(values[i:i + self._chunk_size])}&"
+                    f"inputTaxon={input_taxon_value}&"
+                    f"outputTaxon={output_taxon_value}&"
+                    f"output={out_db.value.replace(' ', '').lower()}&"
+                    f"format=row"
+                )
 
-        responses: List[bytes] = self._get(urls=urls)
-        df = pd.DataFrame()
-        for response in responses:
-            as_json = json.loads(response.decode())
-            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
+        responses: list[bytes] = [item for response in await self._get(urls) for item in json.loads(response)]
+        df = pd.DataFrame(responses).rename(columns={"InputValue": input_db.value})
 
         # Remove potential duplicate columns
         for column in df.columns:
@@ -267,14 +284,12 @@ class BioDBNet(FastHTTP):
             elif str(column).endswith("_y"):
                 df.rename(columns={column: column[:-2]}, inplace=True)
 
-        df.rename(columns={"InputValue": input_db.value}, inplace=True)
-
         return df
 
-    def dbAnnot(
+    async def db_annot(
         self,
-        values: List[str],
-        annotations: List[
+        values: list[str],
+        annotation: list[
             Literal[
                 "Drugs",
                 "Diseases",
@@ -286,45 +301,57 @@ class BioDBNet(FastHTTP):
         ],
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)[0]
-        annotations = [a.replace(" ", "").lower() for a in sorted(annotations)]
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
+        annotation = [a.replace(" ", "").lower() for a in sorted(annotation)]
 
         values.sort()
         urls: list[str] = []
         for i in range(0, len(values), self._chunk_size):
-            urls.append(self.url + "?method=dbannot")
-            urls[-1] += f"&inputValues={','.join(values[i:i + self._chunk_size])}"
-            urls[-1] += f"&taxonId={taxon_id}"
-            urls[-1] += f"&annotations={','.join(annotations)}"
-            urls[-1] += "&format=row"
+            urls.append(
+                f"{self.url}?method=dbannot&"
+                f"inputValues={','.join(values[i:i + self._chunk_size])}&"
+                f"taxonId={taxon_id}&"
+                f"annotations={','.join(annotation)}&"
+                f"format=row"
+            )
 
-        responses: list[bytes] = self._get(urls=urls)
-        df = pd.DataFrame()
-        for response in responses:
-            as_json = json.loads(response.decode())
-            df = pd.concat([df, pd.DataFrame(as_json)], ignore_index=True)
-        df = df.rename(columns={"InputValue": "Input Value"})
-        return df
+        responses: list[bytes] = await self._get(urls=urls)
+        return pd.DataFrame(responses)
 
-    def dbOrg(self, input_db: Input, output_db: Output, taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
-        taxon_id = self._validate_taxon_id(taxon)
+    async def db_org(self, input_db: Input, output_db: Output, taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
+        taxon_id = (await self._validate_taxon_id(taxon))[0]
         input_db_val = input_db.value.replace(" ", "_")
         output_db_val = output_db.value.replace(" ", "_")
 
         url = f"https://biodbnet-abcc.ncifcrf.gov/db/dbOrgDwnld.php?file={input_db_val}__to__{output_db_val}_{taxon_id}"
-        buffer = io.StringIO(self._get(url)[0].decode())
+        response = await self._get(url)
+        buffer = io.StringIO(response[0].decode())
         return pd.read_csv(buffer, sep="\t", header=None, names=[input_db.value, output_db.value])
 
 
 if __name__ == "__main__":
-    filepath = "/Users/joshl/Projects/COMO/main/data/data_matrices/naiveB/gene_counts_matrix_full_naiveB.csv"
-    df = pd.read_csv(filepath)
-    values = df["ensembl_gene_id"].tolist()
 
-    biodbnet = BioDBNet()
-    result = biodbnet.db2db(
-        values=values,
-        input_db=Input.ENSEMBL_GENE_ID,
-        output_db=[Output.GENE_ID, Output.CHROMOSOMAL_LOCATION],
-    )
-    print(result)
+    async def run(_biodbnet: BioDBNet, _counts: pd.DataFrame):
+        # Get the first 250 values and last 250 values from _counts.index
+        db_find = await asyncio.gather(
+            *[
+                _biodbnet.db_find(
+                    values=_counts.index.tolist()[:10],
+                    output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
+                    taxon=Taxon.HOMO_SAPIENS,
+                ),
+                # _biodbnet.db2db(
+                #     values=_counts.index.tolist()[:250],
+                #     input_db=Input.GENE_SYMBOL,
+                #     output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
+                #     taxon=Taxon.HOMO_SAPIENS,
+                # ),
+            ]
+        )
+        print(db_find)
+
+    print("Reading data")
+    counts = pd.read_csv("/Users/joshl/Downloads/counts_matrix.csv", index_col=0)
+    biodbnet = BioDBNet(cache=False, chunk_size=5)
+    print("Starting 'run'")
+    asyncio.run(run(biodbnet, counts))
