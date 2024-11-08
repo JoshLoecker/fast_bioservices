@@ -1,7 +1,25 @@
 from enum import Enum
+from typing import Type, TypeVar
+
+T = TypeVar("T", bound=Enum)
 
 
-class Taxon(int, Enum):
+def _from_string(input_value: str, from_enum: Type[T]) -> T:
+    v = input_value.lower()
+
+    for item in from_enum:
+        key = item.name.lower()
+        value = str(item.value).lower()
+
+        if v == key or v in key:
+            return from_enum[item.name]
+        if v == value or v in value:
+            return from_enum(item.value)
+
+    raise ValueError(f"Unknown input '{input_value}'")
+
+
+class Taxon(Enum):
     ARABIDOPSIS_THALIANA = 3702
     BOS_TAURUS = 9913
     CAENORHABDITIS_ELEGANS = 6239
@@ -25,16 +43,22 @@ class Taxon(int, Enum):
     ZEA_MAYS = 4577
 
     @staticmethod
-    def from_string(value: str) -> "Taxon":
-        if value.lower() in {"human", "humans", "homo sapiens"}:
-            return Taxon.HOMO_SAPIENS
-        elif value.lower() in {"mouse", "mus musculus"}:
-            return Taxon.MUS_MUSCULUS
-        else:
-            raise ValueError(f"Unknown taxon: '{value}'")
+    def values() -> list[int]:
+        return [i.value for i in Taxon]
+
+    @classmethod
+    def from_int(cls, input_value: int) -> "Taxon":
+        for item in cls._member_map_.values():
+            if input_value == item.value:
+                return cls(item.value)
+        raise ValueError(f"Unknown value '{input_value}'")
+
+    @classmethod
+    def from_string(cls, input_value: str) -> "Taxon":
+        return _from_string(input_value, cls)
 
 
-class Input(str, Enum):
+class Input(Enum):
     """
     These are valid input database types for the BioDBNet API.
     """
@@ -104,8 +128,12 @@ class Input(str, Enum):
     UNIPROT_PROTEIN_NAME = "UniProt Protein Name"
     UNISTS_ID = "UniSTS ID"
 
+    @classmethod
+    def from_string(cls, input_value: str) -> "Input":
+        return _from_string(input_value, cls)
 
-class Output(str, Enum):
+
+class Output(Enum):
     """
     These are valid output database types for the BioDBNet API.
     """
@@ -311,6 +339,18 @@ class Output(str, Enum):
     XENBASE_GENE_ID = "XenBase Gene ID"
     ZFIN_ID = "ZFIN ID"
 
+    @classmethod
+    def from_string(cls, input_value: str) -> "Output":
+        return _from_string(input_value, cls)
+
 
 if __name__ == "__main__":
-    print(Input["GENE_ID"].value)
+    x = Taxon.from_string("9606")
+    y = Input.from_string("ENSEMBL GENE ID")
+    z = Output.from_string("ENSEMBL GENE ID")
+    a = Input.from_string("ensembl")
+
+    print(x.name, x.value)
+    print(y.name, y.value)
+    print(z.name, z.value)
+    print(a.name, a.value)
