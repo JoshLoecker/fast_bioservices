@@ -33,7 +33,7 @@ class CrossReference(Ensembl):
     def __init__(self, cache: bool = True):
         super().__init__(cache=cache)
 
-    def get_ensembl_from_external(
+    async def get_ensembl_from_external(
         self,
         species: str,
         gene_symbols: Union[str, List[str]],
@@ -56,12 +56,12 @@ class CrossReference(Ensembl):
             urls.append(self._url + path)
 
         references: list[EnsemblReference] = []
-        for i, result in enumerate(self._get(urls=urls, headers={"Content-Type": "application/json"})):
+        for i, result in enumerate(await self._get(urls=urls, headers={"Content-Type": "application/json"})):
             as_json = json.loads(result.decode())[0]
             references.append(EnsemblReference(**as_json, input=gene_symbols[i]))
         return references
 
-    def get_external_from_ensembl(
+    async def get_external_from_ensembl(
         self,
         ensembl_id: Union[str, List[str]],
         db_type: Literal["core"] = "core",
@@ -86,7 +86,7 @@ class CrossReference(Ensembl):
             urls.append(self._url + path)
 
         references: list[ExternalReference] = []
-        for result in self._get(urls=urls, headers={"Content-Type": "application/json"}):
+        for result in await self._get(urls=urls, headers={"Content-Type": "application/json"}):
             as_json = json.loads(result.decode())[0]
             references.append(ExternalReference(**as_json))
 

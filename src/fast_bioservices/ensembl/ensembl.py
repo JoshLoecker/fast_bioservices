@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from typing import List, Optional
 
-from fast_bioservices.fast_http import FastHTTP
+from fast_bioservices.fast_http import AsyncHTTPClient
 from fast_bioservices.utils import fuzzy_search
 
 
@@ -28,10 +28,10 @@ class FuzzyResult:
     score: float
 
 
-class Ensembl(FastHTTP):
+class Ensembl(AsyncHTTPClient):
     def __init__(self, cache: bool = True):
         self._url = "https://rest.ensembl.org"
-        FastHTTP.__init__(self, cache=cache, max_requests_per_second=15)
+        AsyncHTTPClient.__init__(self, cache=cache, max_requests_per_second=15)
 
     @property
     def url(self) -> str:

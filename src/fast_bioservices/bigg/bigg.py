@@ -1,15 +1,15 @@
 import json
 from typing import Any, Literal, Mapping, Optional
 
-from fast_bioservices.fast_http import FastHTTP
+from fast_bioservices.fast_http import AsyncHTTPClient
 
 
-class BiGG(FastHTTP):
+class BiGG(AsyncHTTPClient):
     _download_url: str = "http://bigg.ucsd.edu/static/models"
 
     def __init__(self, cache: bool = True):
         self._url: str = "http://bigg.ucsd.edu/api/v2"
-        FastHTTP.__init__(self, cache=cache, max_requests_per_second=10)
+        AsyncHTTPClient.__init__(self, cache=cache, max_requests_per_second=10)
 
     @property
     def url(self) -> str:
