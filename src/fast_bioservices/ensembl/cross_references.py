@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Union
+from typing import Literal
 
 from fast_bioservices.ensembl.ensembl import Ensembl, Species
 
@@ -16,7 +18,7 @@ class EnsemblReference:
 class ExternalReference:
     description: str
     info_text: str
-    synonyms: List[str]
+    synonyms: list[str]
     dbname: str
     info_type: str
     db_display_name: str
@@ -33,16 +35,17 @@ class CrossReference(Ensembl):
     def __init__(self, cache: bool = True):
         super().__init__(cache=cache)
 
-    async def get_ensembl_from_external(
+    async def by_external(
         self,
         species: str,
-        gene_symbols: Union[str, List[str]],
+        gene_symbols: str | list[str],
         db_type: Literal["core"] = "core",
-        external_db_filter: Optional[str] = None,
-        feature_filter: Optional[str] = None,
+        external_db_filter: str | None = None,
+        feature_filter: str | None = None,
     ):
-        validate_species: Optional[Species] = self._match_species(species)
-        assert validate_species is not None, f"Species {species} not found"
+        validate_species: Species | None = self._match_species(species)
+        if validate_species is None:
+            raise ValueError(f"Species {species} not found")
 
         gene_symbols = [gene_symbols] if isinstance(gene_symbols, str) else gene_symbols
 
@@ -61,48 +64,48 @@ class CrossReference(Ensembl):
             references.append(EnsemblReference(**as_json, input=gene_symbols[i]))
         return references
 
-    async def get_external_from_ensembl(
+    async def by_ensembl(
         self,
-        ensembl_id: Union[str, List[str]],
-        db_type: Literal["core"] = "core",
+        ids: str | list[str],
+        db_type: Literal["core", "otherfeatures"] = "core",
         all_levels: bool = False,
-        external_db_filter: Optional[str] = None,
-        feature_filter: Optional[str] = None,
-        species: Optional[str] = None,
-    ) -> List[ExternalReference]:
-        ensembl_id = [ensembl_id] if isinstance(ensembl_id, str) else ensembl_id
+        external_db_filter: str | None = None,
+        feature_filter: str | None = None,
+        species: str | None = None,
+    ) -> dict[str, list[dict]]:
+        ids = [ids] if isinstance(ids, str) else ids
 
         urls = []
-        for e_id in ensembl_id:
+        for e_id in ids:
             path = f"/xrefs/id/{e_id}?db_type={db_type}"
             if all_levels:
-                path += ";all_levels=1"
+                path += "&all_levels=1"
             if external_db_filter:
-                path += f";external_db={external_db_filter}"
+                path += f"&external_db={external_db_filter}"
             if feature_filter:
-                path += f";object_type={feature_filter}"
+                path += f"&object_type={feature_filter}"
             if species:
-                path += f";species={species}"
+                path += f"&species={species}"
             urls.append(self._url + path)
 
-        references: list[ExternalReference] = []
-        for result in await self._get(urls=urls, headers={"Content-Type": "application/json"}):
-            as_json = json.loads(result.decode())[0]
-            references.append(ExternalReference(**as_json))
-
-        return references
+        results: dict[str, list[dict]] = {}
+        for i, result in enumerate(await self._get(urls=urls, headers={"Content-Type": "application/json"})):
+            results[ids[i]] = json.loads(result)
+        return results
 
     @property
     def url(self) -> str:
         return self._url
 
 
-def main():
+async def _main():
     c = CrossReference()
 
-    r = c.get_ensembl_from_external("human", ["GOLT1A", "GOLT1B"])
-    print(r)
+    one = await c.by_ensembl(ids=["ENSG00000157764"])
+    print(one)
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(_main())
