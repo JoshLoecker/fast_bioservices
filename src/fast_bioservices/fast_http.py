@@ -35,44 +35,42 @@ def _key_generator(request: httpx.Request | httpcore.Request, body: bytes = b"")
     return f"{method}|{host}|{key}"
 
 
-class AsyncRateLimitTransport(httpx.AsyncBaseTransport):
+class _AsyncRateLimitTransport(httpx.AsyncBaseTransport):
     """
     Implement rate limiting on httpx transports; ignores hishel transport cache
     """
 
     def __init__(self, rate: int | float, use_cache: bool, period: int = 1):
-        self._transport = httpx.AsyncHTTPTransport()
-        self._rate = rate  # Requests per second
-        self._period = period
-        self._use_cache = use_cache
-        self._last_reset = time.time()
-        self._requests_in_period = 0
+        self.transport = httpx.AsyncHTTPTransport()
+        self.rate = rate  # Requests per second
+        self.period = period
+        self.use_cache = use_cache
+        self.last_reset = time.time()
+        self.requests_in_period = 0
 
     async def handle_async_request(self, request: Request) -> Response:
         now = time.time()
-        if now - self._last_reset >= self._period:  # We've waited for `period` seconds since last reset, reset counter
-            self._last_reset = now
-            self._requests_in_period = 0
+        if now - self.last_reset >= self.period:  # We've waited for `period` seconds since last reset, reset counter
+            self.last_reset = now
+            self.requests_in_period = 0
 
-        while self._requests_in_period >= self._rate:  # We've hit the rate limit, sleep
-            logger.trace(f"Sleeping for {1 / self._rate} seconds")
-            await asyncio.sleep(1 / self._rate)
+        while self.requests_in_period >= self.rate:  # We've hit the rate limit, sleep
+            logger.trace(f"Sleeping for {1 / self.rate} seconds")
+            await asyncio.sleep(1 / self.rate)
             now = time.time()
-            if now - self._last_reset >= self._period:  # Make sure that we've waited long enough
-                self._last_reset = now
-                self._requests_in_period = 0
+            if now - self.last_reset >= self.period:  # Make sure that we've waited long enough
+                self.last_reset = now
+                self.requests_in_period = 0
                 break
 
-        self._requests_in_period += 1
-        return await self._transport.handle_async_request(request)
+        self.requests_in_period += 1
+        return await self.transport.handle_async_request(request)
 
 
-class AsyncHTTPClient(ABC):
-    def __init__(self, *, cache: bool, max_requests_per_second: int | None = 5) -> None:
+class _AsyncHTTPClient(ABC):
+    def __init__(self, *, cache: bool, max_requests_per_second) -> None:
         self._use_cache: bool = cache
-        self._requests_per_second: int = max_requests_per_second
-
-        transport = AsyncRateLimitTransport(rate=max_requests_per_second, use_cache=self._use_cache)
+        transport = _AsyncRateLimitTransport(rate=max_requests_per_second, use_cache=self._use_cache)
         if self._use_cache:
             self._storage = hishel.AsyncFileStorage(base_path=cache_dir, ttl=sys.maxsize)
             self._controller = hishel.Controller(
@@ -86,8 +84,11 @@ class AsyncHTTPClient(ABC):
             self._transport = transport
         self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
 
-        self._current_requests: int = 0
-        self._total_requests: int = 0
+        self.__current_requests: int = 0
+        self.__total_requests: int = 0
+
+    def update_rate_limit(self, value: int):
+        self._transport.rate = value
 
     @staticmethod
     def _make_safe_url(urls: str | list[str]) -> list[str]:
@@ -97,12 +98,12 @@ class AsyncHTTPClient(ABC):
             return [urllib.parse.quote(urls, safe=safe)]
         return [urllib.parse.quote(url, safe=safe) for url in urls]
 
-    def _log_on_complete_callback(self, *, cached: bool):
-        self._current_requests += 1
+    def _log_callback(self, *, cached: bool):
+        self.__current_requests += 1
         ending = "with cache" if cached else "without cache"
-        logger.debug(f"Finished {self._current_requests:>{len(str(self._total_requests))}} of {self._total_requests} ({ending})")
+        logger.debug(f"Finished {self.__current_requests:>{len(str(self.__total_requests))}} of {self.__total_requests} ({ending})")
 
-    async def _perform_action(self, func: Literal["get", "post"], url: str, /, log_on_complete: bool, **kwargs):
+    async def __perform_action(self, func: Literal["get", "post"], url: str, /, log_on_complete: bool, **kwargs):
         try:
             response: httpx.Response
             async with self._transport:
@@ -122,9 +123,9 @@ class AsyncHTTPClient(ABC):
 
         if log_on_complete:
             if "from_cache" in response.extensions and response.extensions["from_cache"]:
-                self._log_on_complete_callback(cached=True)
+                self._log_callback(cached=True)
             else:
-                self._log_on_complete_callback(cached=False)
+                self._log_callback(cached=False)
         return response.content
 
     async def _get(
@@ -136,15 +137,23 @@ class AsyncHTTPClient(ABC):
         extensions: dict | None = None,
     ) -> list[bytes]:
         urls = self._make_safe_url(urls)
-        self._current_requests = 0
-        self._total_requests = len(urls) if isinstance(urls, list) else 1
-
+        self.__current_requests = 0
+        self.__total_requests = len(urls) if isinstance(urls, list) else 1
         headers = headers or {}
         extensions = extensions or {}
         extensions["cache_disabled"] = temp_disable_cache
 
         responses: list[bytes] = await asyncio.gather(
-            *[self._perform_action("get", url, log_on_complete, headers=headers, extensions=extensions) for url in urls]
+            *[
+                self.__perform_action(
+                    "get",
+                    url,
+                    log_on_complete,
+                    headers=headers,
+                    extensions=extensions,
+                )
+                for url in urls
+            ]
         )
         return responses
 
@@ -158,14 +167,24 @@ class AsyncHTTPClient(ABC):
         extensions: dict | None = None,
     ):
         urls = self._make_safe_url(urls)
-        self._current_requests = 0
-        self._total_requests = len(urls) if isinstance(urls, list) else 1
+        self.__current_requests = 0
+        self.__total_requests = len(urls) if isinstance(urls, list) else 1
 
         headers = headers or {}
         extensions = extensions or {}
         extensions["cache_disabled"] = temp_disable_cache
 
         responses: list[bytes] = await asyncio.gather(
-            *[self._perform_action("post", url, log_on_complete, data=data, headers=headers, extensions=extensions) for url in urls]
+            *[
+                self.__perform_action(
+                    "post",
+                    url,
+                    log_on_complete,
+                    data=data,
+                    headers=headers,
+                    extensions=extensions,
+                )
+                for url in urls
+            ]
         )
         return responses
