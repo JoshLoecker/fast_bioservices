@@ -9,10 +9,10 @@ import pandas as pd
 from loguru import logger
 
 from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
-from fast_bioservices.fast_http import AsyncHTTPClient
+from fast_bioservices.fast_http import _AsyncHTTPClient
 
 
-class BioDBNet(AsyncHTTPClient):
+class BioDBNet(_AsyncHTTPClient):
     def __init__(self, cache: bool = True, chunk_size: int = 250):
         super().__init__(cache=cache, max_requests_per_second=10)
         self._url = "https://biodbnet-abcc.ncifcrf.gov/webServices/rest.php/biodbnetRestApi.json"
