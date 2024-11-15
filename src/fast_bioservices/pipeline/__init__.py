@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import inplace
+
 import pandas as pd
 
 from fast_bioservices.biothings.mygene import MyGene
@@ -37,12 +39,14 @@ async def determine_gene_type(items: str | list[str], species: str, api_key: str
 
 
 async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
-    data = {"ensembl_gene_id": [], "entrez_gene_id": [], "gene_symbol": []}
+    data = []
     for result in await MyGene(cache=cache).gene(ids=ids):
-        data["ensembl_gene_id"].append(result["ensembl"]["gene"]) if "ensembl" in result and "gene" in result["ensembl"] else "-"
-        data["entrez_gene_id"].append(result["entrezgene"]) if "entrezgene" in result else "-"
-        data["gene_symbol"].append(result["symbol"]) if "symbol" in result else "-"
-    return pd.DataFrame(data).set_index("ensembl_gene_id", drop=True)
+        ensembl_data = result.get("ensembl", {})
+        ensembl_gene_id = ",".join(i["gene"] for i in ensembl_data) if isinstance(ensembl_data, list) else ensembl_data.get("gene", "-")
+        entrez_gene_id = result.get("entrezgene", "-")
+        symbol = result.get("symbol", "-")
+        data.append({"ensembl_gene_id": ensembl_gene_id, "entrez_gene_id": entrez_gene_id, "gene_symbol": symbol})
+    return pd.DataFrame(data)
 
 
 async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
@@ -76,8 +80,9 @@ async def _main():
     #         "--matrix", "/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv"
     df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
     ids = df["genes"].tolist()
-    ids = ids[:20]
-    await ensembl_to_gene_id_and_symbol(ids=ids)
+    # ids = ids[:20]
+    df = await ensembl_to_gene_id_and_symbol(ids=ids)
+    print(df)
 
 
 if __name__ == "__main__":
