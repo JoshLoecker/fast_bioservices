@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 
 from fast_bioservices.common import Taxon
 from fast_bioservices.ensembl.cross_references import CrossReference
@@ -10,6 +11,7 @@ __all__ = ["CrossReference"]
 # __all__ = ["GetAlignment", "GetCafeTree", "GetGeneTree", "GetHomology", "HomologyResult", "CrossReference"]
 
 
+@lru_cache
 async def get_valid_ensembl_species(value: int | str | Taxon):
     client = _AsyncHTTPClient(cache=False, max_requests_per_second=1)
     ensembl_species = (
