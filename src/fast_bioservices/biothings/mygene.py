@@ -25,8 +25,8 @@ class MyGene(_AsyncHTTPClient):
         data = [json.dumps({"ids": chunk}) for chunk in chunks]
         responses = await self._post(url, data=data, headers={"Content-type": "application/json"})
         results = []
-        for result in responses:
-            results.extend(json.loads(result))
+        for response in responses:
+            results.extend(json.loads(response))
         return results
 
     async def query(self):
@@ -39,10 +39,7 @@ class MyGene(_AsyncHTTPClient):
 async def _main():
     m = MyGene()
     r = await m.gene(["ENSG00000170558", "ENSG00000153563"], taxon=Taxon.HOMO_SAPIENS)
-    print(r[0].keys())
-    print(r[0]["entrezgene"])
-    print(r[0]["ensembl"]["gene"])
-    print(r[0]["symbol"])
+    print(r)
 
 
 if __name__ == "__main__":
