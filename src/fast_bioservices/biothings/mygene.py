@@ -19,15 +19,12 @@ class MyGene(_AsyncHTTPClient):
         ids = [ids] if isinstance(ids, str) else ids
         url = f"{self._base_url}/gene"
         chunks = [ids[i : i + self._chunk_size] for i in range(0, len(ids), self._chunk_size)]
-        tasks = [self._post(url, data=json.dumps({"ids": chunk}), headers={"Content-type": "application/json"}) for chunk in chunks]
-        results: list[list[bytes]] = await asyncio.gather(*tasks)
 
-        # Flatten `results` into a single list of dictionaries
-        flat: list[dict] = []
-        for result in results:
-            for as_bytes in result:
-                flat.extend(json.loads(as_bytes))
-        return flat
+        results: list[dict] = []
+        for chunk in chunks:
+            response = (await self._post(url, data=json.dumps({"ids": chunk}), headers={"Content-type": "application/json"}))[0]
+            results.extend(json.loads(response))
+        return results
 
     async def query(self):
         raise NotImplementedError("Not implemented yet")
