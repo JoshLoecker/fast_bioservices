@@ -50,7 +50,9 @@ async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True
 
 async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
     data = {"entrez_gene_id": [], "ensembl_gene_id": [], "gene_symbol": []}
-    for result in await MyGene(cache=cache).gene(ids=ids):
+    for result in await MyGene(cache=cache).gene(
+        ids=ids,
+    ):
         data["entrez_gene_id"].append(result["entrezgene"]) if "entrezgene" in result else "-"
         data["ensembl_gene_id"].append(result["ensembl"]["gene"]) if "ensembl" in result and "gene" in result["ensembl"] else "-"
         data["gene_symbol"].append(result["symbol"]) if "symbol" in result else "-"

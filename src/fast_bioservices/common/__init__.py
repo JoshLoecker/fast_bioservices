@@ -1,22 +1,11 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Type, TypeVar
 
+from loguru import logger
+
 T = TypeVar("T", bound=Enum)
-
-
-def _from_string(input_value: str, from_enum: Type[T]) -> T:
-    v = input_value.lower()
-
-    for item in from_enum:
-        key = item.name.lower()
-        value = str(item.value).lower()
-
-        if v == key or v in key:
-            return from_enum[item.name]
-        if v == value or v in value:
-            return from_enum(item.value)
-
-    raise ValueError(f"Unknown input '{input_value}'")
 
 
 class Taxon(Enum):
@@ -56,3 +45,33 @@ class Taxon(Enum):
     @classmethod
     def from_string(cls, value: str) -> "Taxon":
         return _from_string(value, cls)
+
+
+ANY_TAXON = int | str | Taxon | list[int | str | Taxon]
+
+
+def _from_string(input_value: str, from_enum: Type[T]) -> T:
+    v = input_value.lower()
+
+    for item in from_enum:
+        key = item.name.lower()
+        value = str(item.value).lower()
+
+        if v == key or v in key:
+            return from_enum[item.name]
+        if v == value or v in value:
+            return from_enum(item.value)
+
+    raise ValueError(f"Unknown input '{input_value}'")
+
+
+async def _validate_taxon_id(taxon: int | str | Taxon) -> int:
+    if isinstance(taxon, Taxon):
+        return taxon.value
+    elif isinstance(taxon, int):
+        return taxon
+    elif isinstance(taxon, str):
+        logger.warning(f"The provided taxon ID ('{taxon}') is a string, attempting to map it to a known integer value...")
+        return Taxon.from_string(taxon).value
+    else:
+        raise ValueError(f"Unknown taxon type for '{taxon}': {type(taxon)}")
