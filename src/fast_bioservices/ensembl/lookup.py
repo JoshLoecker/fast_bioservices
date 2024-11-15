@@ -4,6 +4,7 @@ import json
 from typing import Literal
 
 from fast_bioservices.common import Taxon
+from fast_bioservices.common.ensembl import get_valid_ensembl_species
 from fast_bioservices.ensembl import Ensembl
 
 
@@ -32,7 +33,7 @@ class Lookup(Ensembl):
         return await self._process(url=url, as_type="ids", items=ensembl_ids)
 
     async def by_symbol(self, symbols: str | list[str], species: int | str | Taxon) -> list[dict]:
-        ensembl_taxon = await self.get_valid_ensembl_species(species)
+        ensembl_taxon = await get_valid_ensembl_species(species)
         url = f"{self._base}/lookup/symbol/{ensembl_taxon}"
         symbols = [symbols] if isinstance(symbols, str) else symbols
         return await self._process(url=url, as_type="symbols", items=symbols)

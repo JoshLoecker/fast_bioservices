@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from fast_bioservices.common import Taxon
+from fast_bioservices.common.ensembl import get_valid_ensembl_species
 from fast_bioservices.ensembl import Ensembl
 
 
@@ -44,7 +45,7 @@ class CrossReference(Ensembl):
         external_db_filter: str | None = None,
         feature_filter: str | None = None,
     ):
-        ensembl_species = await self.get_valid_ensembl_species(species)
+        ensembl_species = await get_valid_ensembl_species(species)
         gene_symbols = [gene_symbols] if isinstance(gene_symbols, str) else gene_symbols
 
         urls = []
