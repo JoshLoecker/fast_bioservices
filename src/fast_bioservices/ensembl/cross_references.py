@@ -43,7 +43,7 @@ class CrossReference(Ensembl):
         external_db_filter: str | None = None,
         feature_filter: str | None = None,
     ):
-        validate_species: Species | None = self._match_species(species)
+        validate_species: Species | None = await self._match_species(species)
         if validate_species is None:
             raise ValueError(f"Species {species} not found")
 
@@ -58,10 +58,9 @@ class CrossReference(Ensembl):
                 path += f";object_type={feature_filter}"
             urls.append(self._url + path)
 
-        references: list[EnsemblReference] = []
+        references: list[dict] = []
         for i, result in enumerate(await self._get(urls=urls, headers={"Content-Type": "application/json"})):
-            as_json = json.loads(result.decode())[0]
-            references.append(EnsemblReference(**as_json, input=gene_symbols[i]))
+            references.extend(json.loads(result))
         return references
 
     async def by_ensembl(
@@ -72,7 +71,7 @@ class CrossReference(Ensembl):
         external_db_filter: str | None = None,
         feature_filter: str | None = None,
         species: str | None = None,
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, dict]:
         ids = [ids] if isinstance(ids, str) else ids
 
         urls = []
@@ -89,8 +88,12 @@ class CrossReference(Ensembl):
             urls.append(self._url + path)
 
         results: dict[str, list[dict]] = {}
-        for i, result in enumerate(await self._get(urls=urls, headers={"Content-Type": "application/json"})):
-            results[ids[i]] = json.loads(result)
+        responses = await self._get(urls=urls, headers={"Content-Type": "application/json"})
+        for i, response in enumerate(responses):
+            try:
+                results[ids[i]] = json.loads(response)
+            except Exception:
+                print(response.decode())
         return results
 
     @property
@@ -99,10 +102,20 @@ class CrossReference(Ensembl):
 
 
 async def _main():
-    c = CrossReference()
+    import pandas as pd
 
-    one = await c.by_ensembl(ids=["ENSG00000157764"])
-    print(one)
+    c = CrossReference(cache=False)
+    df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
+    ids = df["genes"].tolist()
+
+    await c.by_ensembl(ids=ids)
+
+    # for chunk in range(0, len(ids), 1000):
+    #     await c.by_ensembl(ids=ids[chunk : chunk + 1000])
+    # convert = await c.by_ensembl(ids=ids)
+    # print(convert)
+    # print(type(convert))
+    # print(len(convert))
 
 
 if __name__ == "__main__":
