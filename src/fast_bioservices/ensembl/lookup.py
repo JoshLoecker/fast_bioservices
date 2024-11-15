@@ -3,16 +3,17 @@ from __future__ import annotations
 import json
 from typing import Literal
 
-from fast_bioservices.fast_http import _AsyncHTTPClient
+from fast_bioservices.common import Taxon
+from fast_bioservices.ensembl import Ensembl
 
 
-class Lookup(_AsyncHTTPClient):
+class Lookup(Ensembl):
     def __init__(self, cache: bool = True):
         self._base: str = "https://rest.ensembl.org"
         self._cache: bool = cache
         self._max_requests_per_second: int = 12
 
-        super().__init__(cache=cache, max_requests_per_second=self._max_requests_per_second)
+        super().__init__(cache=cache)
 
     async def _process(self, *, url: str, as_type: Literal["ids", "symbols"], items: list[str]) -> list[dict]:
         response = (
@@ -30,8 +31,9 @@ class Lookup(_AsyncHTTPClient):
         ensembl_ids = [ensembl_ids] if isinstance(ensembl_ids, str) else ensembl_ids
         return await self._process(url=url, as_type="ids", items=ensembl_ids)
 
-    async def by_symbol(self, symbols: str | list[str], species: str) -> list[dict]:
-        url = f"{self._base}/lookup/symbol/{species}"
+    async def by_symbol(self, symbols: str | list[str], species: int | str | Taxon) -> list[dict]:
+        ensembl_taxon = await self.get_valid_ensembl_species(species)
+        url = f"{self._base}/lookup/symbol/{ensembl_taxon}"
         symbols = [symbols] if isinstance(symbols, str) else symbols
         return await self._process(url=url, as_type="symbols", items=symbols)
 
