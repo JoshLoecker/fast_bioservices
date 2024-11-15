@@ -23,21 +23,21 @@ async def ensembl_to_gene_id_and_symbol(ids: str | list[str], taxon: int | str |
     return pd.DataFrame(data)
 
 
-async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
+async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], taxon: int | str | Taxon, cache: bool = True) -> pd.DataFrame:
     data = {"entrez_gene_id": [], "ensembl_gene_id": [], "gene_symbol": []}
-    for result in await MyGene(cache=cache).gene(
-        ids=ids,
-    ):
+    for result in await MyGene(cache=cache).gene(ids=ids, taxon=taxon):
         data["entrez_gene_id"].append(result["entrezgene"]) if "entrezgene" in result else "-"
         data["ensembl_gene_id"].append(result["ensembl"]["gene"]) if "ensembl" in result and "gene" in result["ensembl"] else "-"
         data["gene_symbol"].append(result["symbol"]) if "symbol" in result else "-"
     return pd.DataFrame(data).set_index("entrez_gene_id", drop=True)
 
 
-async def gene_symbol_to_ensembl_and_gene_id(symbols: str | list[str], species: str, cache: bool = True, ncbi_api_key: str = "") -> pd.DataFrame:
+async def gene_symbol_to_ensembl_and_gene_id(
+    symbols: str | list[str], taxon: int | str | Taxon, cache: bool = True, ncbi_api_key: str = ""
+) -> pd.DataFrame:
     symbols = [symbols] if isinstance(symbols, str) else symbols
     tasks = [
-        Lookup(cache=cache).by_symbol(symbols=symbols, species=species),
+        Lookup(cache=cache).by_symbol(symbols=symbols, species=taxon),
         Gene(cache=cache, api_key=ncbi_api_key).report_by_symbol(symbols=symbols, taxon=species),
     ]
     ensembl_response, ncbi_response = await asyncio.gather(*tasks)
@@ -56,7 +56,7 @@ async def _main():
     #         "--matrix", "/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv"
     df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
     ids = df["genes"].tolist()
-    df = await ensembl_to_gene_id_and_symbol(ids=ids)
+    df = await ensembl_to_gene_id_and_symbol(ids=ids, taxon=Taxon.MUS_MUSCULUS)
     print(len(df))
 
 
