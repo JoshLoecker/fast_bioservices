@@ -140,17 +140,7 @@ class _AsyncHTTPClient(ABC):
                 self._log_callback(cached=False)
         return response.content
 
-    async def _setup_requests(self, urls: str | list[str], headers: dict, extensions: dict, temp_disable_cache: bool) -> RequestSetup:
-        # Make urls safe
-        # Safe characters from https://stackoverflow.com/questions/695438
-        safe_chars = "&$+,/:;=?@#"
-        if isinstance(urls, str):
-            urls = [urllib.parse.quote(urls, safe=safe_chars)]
-        else:
-            urls = sorted(urllib.parse.quote(url, safe=safe_chars) for url in urls)
-        self.__current_requests = 0
-        self.__total_requests = len(urls) if isinstance(urls, list) else 1
-
+    def _setup_action(self) -> None:
         # Show update every 10% with a minimum of every 1000
         self.__log_per_step = int(self.__total_requests * 0.1)
         if self.__log_per_step < 1:
@@ -158,10 +148,11 @@ class _AsyncHTTPClient(ABC):
         self.__log_per_step = min(1000, self.__log_per_step)
         logger.debug(f"Will show progress every {self.__log_per_step} steps")
 
-        headers = headers or {}
-        extensions = extensions or {}
-        extensions["cache_disabled"] = temp_disable_cache
-        return RequestSetup(urls=urls, headers=headers, extensions=extensions)
+    def _make_safe_url(self, urls: str | list[str]) -> str | list[str]:
+        safe_chars = "&$+,/:;=?@#"
+        if isinstance(urls, str):
+            return urllib.parse.quote(urls, safe=safe_chars)
+        return sorted(urllib.parse.quote(url, safe=safe_chars) for url in urls)
 
     async def _get(
         self,
@@ -171,10 +162,18 @@ class _AsyncHTTPClient(ABC):
         log_on_complete: bool = True,
         extensions: dict | None = None,
     ) -> list[bytes]:
-        setup: RequestSetup = await self._setup_requests(urls, headers, extensions, temp_disable_cache)
+        # Make urls safe
+        # Safe characters from https://stackoverflow.com/questions/695438
+        urls: list[str] = [self._make_safe_url(urls)] if isinstance(urls, str) else self._make_safe_url(urls)
+        self.__current_requests = 0
+        self.__total_requests = len(urls)
+        headers = headers or {}
+        extensions = extensions or {}
+        extensions["cache_disabled"] = temp_disable_cache
+        self._setup_action()
 
         responses: list[bytes] = await asyncio.gather(
-            *[self.__perform_action("get", url, log_on_complete, headers=setup.headers, extensions=setup.extensions) for url in setup.urls]
+            *[self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions) for url in urls]
         )
         return responses
 
@@ -186,19 +185,21 @@ class _AsyncHTTPClient(ABC):
         temp_disable_cache: bool = False,
         log_on_complete: bool = True,
         extensions: dict | None = None,
-    ):
-        setup: RequestSetup = await self._setup_requests(url, headers, extensions, temp_disable_cache)
-        url = setup.urls[0]
+    ) -> list[bytes]:
+        url: str = self._make_safe_url(url)
+        self.__current_requests = 0
+        self.__total_requests = 1 if isinstance(data, str) else len(data)
+        headers = headers or {}
+        extensions = extensions or {}
+        extensions["cache_disabled"] = temp_disable_cache
+        self._setup_action()
 
         responses: list[bytes]
         if isinstance(data, list):
             responses = await asyncio.gather(
-                *[
-                    self.__perform_action("post", url, log_on_complete, data=chunk, headers=setup.headers, extensions=setup.extensions)
-                    for chunk in data
-                ]
+                *[self.__perform_action("post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions) for chunk in data]
             )
         else:
-            responses = [await self.__perform_action("post", url, log_on_complete, data=data, headers=setup.headers, extensions=setup.extensions)]
+            responses = [await self.__perform_action("post", url, log_on_complete, data=data, headers=headers, extensions=extensions)]
 
         return responses
