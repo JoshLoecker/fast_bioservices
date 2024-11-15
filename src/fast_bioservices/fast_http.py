@@ -5,7 +5,6 @@ import sys
 import time
 import urllib.parse
 from abc import ABC
-from pathlib import Path
 from typing import Literal, NamedTuple
 
 import anysqlite
@@ -50,6 +49,13 @@ def _key_generator(request: httpx.Request | httpcore.Request, body: bytes = b"")
 
 async def _get_database_connection() -> anysqlite.Connection:
     return await anysqlite.connect(db_filepath)
+
+
+def make_safe_url(urls: str | list[str]) -> str | list[str]:
+    safe_chars = "&$+,/:;=?@#"
+    if isinstance(urls, str):
+        return urllib.parse.quote(urls, safe=safe_chars)
+    return sorted(urllib.parse.quote(url, safe=safe_chars) for url in urls)
 
 
 class _AsyncRateLimitTransport(httpx.AsyncBaseTransport):
@@ -148,12 +154,6 @@ class _AsyncHTTPClient(ABC):
         self.__log_per_step = min(1000, self.__log_per_step)
         logger.debug(f"Will show progress every {self.__log_per_step} steps")
 
-    def _make_safe_url(self, urls: str | list[str]) -> str | list[str]:
-        safe_chars = "&$+,/:;=?@#"
-        if isinstance(urls, str):
-            return urllib.parse.quote(urls, safe=safe_chars)
-        return sorted(urllib.parse.quote(url, safe=safe_chars) for url in urls)
-
     async def _get(
         self,
         urls: str | list[str],
@@ -164,7 +164,7 @@ class _AsyncHTTPClient(ABC):
     ) -> list[bytes]:
         # Make urls safe
         # Safe characters from https://stackoverflow.com/questions/695438
-        urls: list[str] = [self._make_safe_url(urls)] if isinstance(urls, str) else self._make_safe_url(urls)
+        urls: list[str] = [make_safe_url(urls)] if isinstance(urls, str) else make_safe_url(urls)
         self.__current_requests = 0
         self.__total_requests = len(urls)
         headers = headers or {}
@@ -186,7 +186,7 @@ class _AsyncHTTPClient(ABC):
         log_on_complete: bool = True,
         extensions: dict | None = None,
     ) -> list[bytes]:
-        url: str = self._make_safe_url(url)
+        url: str = make_safe_url(url)
         self.__current_requests = 0
         self.__total_requests = 1 if isinstance(data, str) else len(data)
         headers = headers or {}
