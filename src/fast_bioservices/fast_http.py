@@ -140,7 +140,7 @@ class _AsyncHTTPClient(ABC):
                 self._log_callback(cached=False)
         return response.content
 
-    async def _setup_requests(self, urls: list[str], headers: dict, extensions: dict, temp_disable_cache: bool) -> RequestSetup:
+    async def _setup_requests(self, urls: str | list[str], headers: dict, extensions: dict, temp_disable_cache: bool) -> RequestSetup:
         # Make urls safe
         # Safe characters from https://stackoverflow.com/questions/695438
         safe_chars = "&$+,/:;=?@#"
@@ -180,18 +180,25 @@ class _AsyncHTTPClient(ABC):
 
     async def _post(
         self,
-        urls: str | list[str],
-        data: str,
+        url: str,
+        data: str | list[str],
         headers: dict | None = None,
         temp_disable_cache: bool = False,
         log_on_complete: bool = True,
         extensions: dict | None = None,
     ):
-        setup: RequestSetup = await self._setup_requests(urls, headers, extensions, temp_disable_cache)
-        responses: list[bytes] = await asyncio.gather(
-            *[
-                self.__perform_action("post", url, log_on_complete, data=data, headers=setup.headers, extensions=setup.extensions)
-                for url in setup.urls
-            ]
-        )
+        setup: RequestSetup = await self._setup_requests(url, headers, extensions, temp_disable_cache)
+        url = setup.urls[0]
+
+        responses: list[bytes]
+        if isinstance(data, list):
+            responses = await asyncio.gather(
+                *[
+                    self.__perform_action("post", url, log_on_complete, data=chunk, headers=setup.headers, extensions=setup.extensions)
+                    for chunk in data
+                ]
+            )
+        else:
+            responses = [await self.__perform_action("post", url, log_on_complete, data=data, headers=setup.headers, extensions=setup.extensions)]
+
         return responses
