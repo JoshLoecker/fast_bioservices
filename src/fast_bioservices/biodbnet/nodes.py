@@ -1,6 +1,6 @@
 from enum import Enum
 
-from fast_bioservices.common import _from_string
+from fast_bioservices.common import from_string
 
 
 class Input(Enum):
@@ -75,7 +75,7 @@ class Input(Enum):
 
     @classmethod
     def from_string(cls, input_value: str) -> "Input":
-        return _from_string(input_value, cls)
+        return from_string(input_value, cls)
 
 
 class Output(Enum):
@@ -286,16 +286,4 @@ class Output(Enum):
 
     @classmethod
     def from_string(cls, input_value: str) -> "Output":
-        return _from_string(input_value, cls)
-
-
-if __name__ == "__main__":
-    x = Taxon.from_string("9606")
-    y = Input.from_string("ENSEMBL GENE ID")
-    z = Output.from_string("ENSEMBL GENE ID")
-    a = Input.from_string("ensembl")
-
-    print(x.name, x.value)
-    print(y.name, y.value)
-    print(z.name, z.value)
-    print(a.name, a.value)
+        return from_string(input_value, cls)
