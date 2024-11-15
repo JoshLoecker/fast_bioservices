@@ -4,7 +4,6 @@ import json
 from functools import lru_cache
 
 from fast_bioservices.common import Taxon
-from fast_bioservices.ensembl.cross_references import CrossReference
 from fast_bioservices.fast_http import _AsyncHTTPClient
 
 
