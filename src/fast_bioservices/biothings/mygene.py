@@ -18,7 +18,7 @@ class MyGene(_AsyncHTTPClient):
         :param taxon: The NCBI Taxonomy ID to use
         :return:
         """
-        taxon_id = validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
         ids = [ids] if isinstance(ids, str) else ids
         url = f"{self._base_url}/gene?species={taxon_id}"
         chunks = [ids[i : i + self._chunk_size] for i in range(0, len(ids), self._chunk_size)]
