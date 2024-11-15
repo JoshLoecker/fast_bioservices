@@ -4,7 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import Literal
 
-from fast_bioservices.ensembl.ensembl import Ensembl, Species
+from fast_bioservices.common import Taxon
+from fast_bioservices.ensembl import Ensembl
 
 
 @dataclass(frozen=True)
@@ -37,21 +38,18 @@ class CrossReference(Ensembl):
 
     async def by_external(
         self,
-        species: str,
+        species: int | str | Taxon,
         gene_symbols: str | list[str],
         db_type: Literal["core"] = "core",
         external_db_filter: str | None = None,
         feature_filter: str | None = None,
     ):
-        validate_species: Species | None = await self._match_species(species)
-        if validate_species is None:
-            raise ValueError(f"Species {species} not found")
-
+        ensembl_species = await self.get_valid_ensembl_species(species)
         gene_symbols = [gene_symbols] if isinstance(gene_symbols, str) else gene_symbols
 
         urls = []
         for symbol in gene_symbols:
-            path = f"/xrefs/symbol/{validate_species.common_name}/{symbol}?db_type={db_type}"
+            path = f"/xrefs/symbol/{ensembl_species}/{symbol}?db_type={db_type}"
             if external_db_filter:
                 path += f";external_db={external_db_filter}"
             if feature_filter:
@@ -87,13 +85,10 @@ class CrossReference(Ensembl):
                 path += f"&species={species}"
             urls.append(self._url + path)
 
-        results: dict[str, list[dict]] = {}
+        results: dict[str, dict] = {}
         responses = await self._get(urls=urls, headers={"Content-Type": "application/json"})
         for i, response in enumerate(responses):
-            try:
-                results[ids[i]] = json.loads(response)
-            except Exception:
-                print(response.decode())
+            results[ids[i]] = json.loads(response)
         return results
 
     @property
