@@ -47,9 +47,6 @@ class Taxon(Enum):
         return _from_string(value, cls)
 
 
-ANY_TAXON = int | str | Taxon | list[int | str | Taxon]
-
-
 def _from_string(input_value: str, from_enum: Type[T]) -> T:
     v = input_value.lower()
 
@@ -65,7 +62,7 @@ def _from_string(input_value: str, from_enum: Type[T]) -> T:
     raise ValueError(f"Unknown input '{input_value}'")
 
 
-async def _validate_taxon_id(taxon: int | str | Taxon) -> int:
+async def validate_taxon_id(taxon: int | str | Taxon) -> int:
     if isinstance(taxon, Taxon):
         return taxon.value
     elif isinstance(taxon, int):
