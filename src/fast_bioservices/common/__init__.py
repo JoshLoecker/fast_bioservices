@@ -44,10 +44,10 @@ class Taxon(Enum):
 
     @classmethod
     def from_string(cls, value: str) -> "Taxon":
-        return _from_string(value, cls)
+        return from_string(value, cls)
 
 
-def _from_string(input_value: str, from_enum: Type[T]) -> T:
+def from_string(input_value: str, from_enum: Type[T]) -> T:
     v = input_value.lower()
 
     for item in from_enum:
