@@ -8,6 +8,7 @@ from fast_bioservices.fast_http import _AsyncHTTPClient
 class MyGene(_AsyncHTTPClient):
     def __init__(self, cache: bool = True):
         self._base_url: str = "https://mygene.info/v3"
+        self._chunk_size: int = 1000
         super().__init__(cache=cache, max_requests_per_second=5)
 
     async def gene(self, ids: str | list[str]) -> list[dict]:
@@ -17,8 +18,16 @@ class MyGene(_AsyncHTTPClient):
         """
         ids = [ids] if isinstance(ids, str) else ids
         url = f"{self._base_url}/gene"
-        results = (await self._post(url, data=json.dumps({"ids": ids}), headers={"Content-type": "application/json"}))[0]
-        return json.loads(results)
+        chunks = [ids[i : i + self._chunk_size] for i in range(0, len(ids), self._chunk_size)]
+        tasks = [self._post(url, data=json.dumps({"ids": chunk}), headers={"Content-type": "application/json"}) for chunk in chunks]
+        results: list[list[bytes]] = await asyncio.gather(*tasks)
+
+        # Flatten `results` into a single list of dictionaries
+        flat: list[dict] = []
+        for result in results:
+            for as_bytes in result:
+                flat.extend(json.loads(as_bytes))
+        return flat
 
     async def query(self):
         raise NotImplementedError("Not implemented yet")
