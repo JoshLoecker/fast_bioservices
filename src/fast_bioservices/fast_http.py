@@ -17,9 +17,6 @@ from loguru import logger
 
 from fast_bioservices.settings import cache_dir, db_filepath
 
-NO_CACHE: str = "no-store, max-age=0"
-MAX_CACHE: str = f"max-age={sys.maxsize}"
-
 
 class RequestSetup(NamedTuple):
     urls: list[str]
