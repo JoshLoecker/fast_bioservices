@@ -38,7 +38,7 @@ async def gene_symbol_to_ensembl_and_gene_id(
     symbols = [symbols] if isinstance(symbols, str) else symbols
     tasks = [
         Lookup(cache=cache).by_symbol(symbols=symbols, species=taxon),
-        Gene(cache=cache, api_key=ncbi_api_key).report_by_symbol(symbols=symbols, taxon=species),
+        Gene(cache=cache, api_key=ncbi_api_key).report_by_symbol(symbols=symbols, taxon=taxon),
     ]
     ensembl_response, ncbi_response = await asyncio.gather(*tasks)
 
