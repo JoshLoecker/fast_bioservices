@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from unittest.mock import inplace
-
 import pandas as pd
 
 from fast_bioservices.biothings.mygene import MyGene

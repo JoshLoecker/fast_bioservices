@@ -8,7 +8,8 @@ from typing import Literal
 import pandas as pd
 from loguru import logger
 
-from fast_bioservices.biodbnet.nodes import Input, Output, Taxon
+from fast_bioservices.biodbnet.nodes import Input, Output
+from fast_bioservices.common import Taxon
 from fast_bioservices.fast_http import _AsyncHTTPClient
 
 

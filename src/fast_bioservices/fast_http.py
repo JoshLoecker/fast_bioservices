@@ -111,7 +111,7 @@ class _AsyncHTTPClient(ABC):
     def _log_callback(self, *, cached: bool):
         self.__current_requests += 1
 
-        if self.__current_requests % self.__log_per_step == 0:
+        if self.__current_requests % self.__log_per_step == 0 or self.__current_requests == self.__total_requests:
             ending = "with cache" if cached else "without cache"
             logger.debug(f"Finished {self.__current_requests:>{len(str(self.__total_requests))}} of {self.__total_requests} ({ending})")
 
