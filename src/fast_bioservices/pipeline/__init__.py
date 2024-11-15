@@ -2,34 +2,56 @@ from __future__ import annotations
 
 import pandas as pd
 
+from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.ensembl.cross_references import CrossReference
 from fast_bioservices.ensembl.lookup import Lookup
 from fast_bioservices.ncbi.datasets import Gene
 
-# def determine_gene_type():
-#     pass
+
+async def determine_gene_type(items: str | list[str], species: str, api_key: str = ""):
+    results: dict[str, str] = {}
+
+    for i in items:
+        if i.startswith("ENS"):
+            results[i] = "ensembl_gene_id"
+        elif i.isdigit():
+            results[i] = "entrez_gene_id"
+        else:
+            results[i] = "gene_symbol"
+
+    reference = CrossReference(cache=False)
+    ncbi_gene = Gene(cache=False, api_key=api_key)
+    test_ensembl = await reference.by_ensembl(ids=items)
+    test_ncbi = await ncbi_gene.report_by_id([i for i in items if i.isdigit()])
+
+    print(test_ncbi)
+
+    for i in items:
+        if "error" not in test_ensembl[i]:  # Item is an ensembl gene id
+            results[i] = "ensembl_gene_id"
+        # if test_ensembl[i]["error"] == f"ID '{i}' not found":
+        # if test_ensembl[i]["error"] == f'ID "{i}" not found':
+
+    # print(ensembl_results)
+    # print(external_results)
 
 
-async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True):
-    results = await CrossReference(cache=cache).by_ensembl(ids=ids, external_db_filter="EntrezGene")
-    data: dict[str, list[str]] = {"ensembl_gene_id": [], "entrez_gene_id": [], "gene_symbol": []}
-    for key in results:
-        for result in results[key]:
-            data["ensembl_gene_id"].append(key)
-            data["entrez_gene_id"].append(result["primary_id"])
-            data["gene_symbol"].append(result["display_id"])
+async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
+    data = {"ensembl_gene_id": [], "entrez_gene_id": [], "gene_symbol": []}
+    for result in await MyGene(cache=cache).gene(ids=ids):
+        data["ensembl_gene_id"].append(result["ensembl"]["gene"])
+        data["entrez_gene_id"] = result["entrezgene"]
+        data["gene_symbol"].append(result["display_name"])
+        data["gene_symbol"].append(result["symbol"])
     return pd.DataFrame(data).set_index("ensembl_gene_id", drop=True)
 
 
-async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], cache: bool = True, ncbi_api_key: str = "") -> pd.DataFrame:
-    results = await Gene(cache=cache, api_key=ncbi_api_key).report_by_id(ids)
-    length = len(results["gene"])
-
-    data = {
-        "entrez_gene_id": [results["gene"][i]["gene_id"] for i in range(length)],
-        "ensembl_gene_id": [",".join(results["gene"][i]["ensembl_gene_ids"]) for i in range(length)],
-        "gene_symbol": [results["gene"][i]["symbol"] for i in range(length)],
-    }
+async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
+    data = {"entrez_gene_id": [], "ensembl_gene_id": [], "gene_symbol": []}
+    for result in await MyGene(cache=cache).gene(ids=ids):
+        data["entrez_gene_id"].append(result["entrezgene"])
+        data["ensembl_gene_id"].append(result["ensembl"]["gene"])
+        data["gene_symbol"].append(result["display_name"])
     return pd.DataFrame(data).set_index("entrez_gene_id", drop=True)
 
 
@@ -51,8 +73,12 @@ async def gene_symbol_to_ensembl_and_gene_id(symbols: str | list[str], species: 
 
 
 async def _main():
-    await ensembl_to_gene_id_and_symbol(ids=["ENSG00000157765", "ENSG00000157766"])
-    # await gene_symbol_to_ensembl_and_gene_id(symbols=["HBA1", "HBA2"], species="Homo sapiens", cache=False)
+    # await determine_gene_type(items=["ENSG00000170558", "1000", "CDH2"], species="human")
+    #         "--matrix", "/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv"
+    df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
+    ids = df["genes"].tolist()
+    ids = ids[:20]
+    await ensembl_to_gene_id_and_symbol(ids=ids)
 
 
 if __name__ == "__main__":
