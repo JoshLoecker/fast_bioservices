@@ -3,43 +3,18 @@ from __future__ import annotations
 import pandas as pd
 
 from fast_bioservices.biothings.mygene import MyGene
-from fast_bioservices.ensembl.cross_references import CrossReference
+from fast_bioservices.common import Taxon
 from fast_bioservices.ensembl.lookup import Lookup
 from fast_bioservices.ncbi.datasets import Gene
 
 
-async def determine_gene_type(items: str | list[str], species: str, api_key: str = ""):
-    results: dict[str, str] = {}
-
-    for i in items:
-        if i.startswith("ENS"):
-            results[i] = "ensembl_gene_id"
-        elif i.isdigit():
-            results[i] = "entrez_gene_id"
-        else:
-            results[i] = "gene_symbol"
-
-    reference = CrossReference(cache=False)
-    ncbi_gene = Gene(cache=False, api_key=api_key)
-    test_ensembl = await reference.by_ensembl(ids=items)
-    test_ncbi = await ncbi_gene.report_by_id([i for i in items if i.isdigit()])
-
-    print(test_ncbi)
-
-    for i in items:
-        if "error" not in test_ensembl[i]:  # Item is an ensembl gene id
-            results[i] = "ensembl_gene_id"
-        # if test_ensembl[i]["error"] == f"ID '{i}' not found":
-        # if test_ensembl[i]["error"] == f'ID "{i}" not found':
-
-    # print(ensembl_results)
-    # print(external_results)
+async def determine_gene_type(items: str | list[str], /) -> dict[str, str]:
+    return {i: "ensembl_gene_id" if i.startswith("ENS") else "entrez_gene_id" if i.isdigit() else "gene_symbol" for i in items}
 
 
-async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
+async def ensembl_to_gene_id_and_symbol(ids: str | list[str], taxon: int | str | Taxon, cache: bool = True) -> pd.DataFrame:
     data = []
-
-    for result in await MyGene(cache=cache).gene(ids=ids):
+    for result in await MyGene(cache=cache).gene(ids=ids, taxon=taxon):
         ensembl_data = result.get("ensembl", {})
         ensembl_gene_id = ",".join(i["gene"] for i in ensembl_data) if isinstance(ensembl_data, list) else ensembl_data.get("gene", "-")
         entrez_gene_id = result.get("entrezgene", "-")
