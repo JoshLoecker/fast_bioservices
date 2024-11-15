@@ -40,6 +40,7 @@ async def determine_gene_type(items: str | list[str], species: str, api_key: str
 
 async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True) -> pd.DataFrame:
     data = []
+
     for result in await MyGene(cache=cache).gene(ids=ids):
         ensembl_data = result.get("ensembl", {})
         ensembl_gene_id = ",".join(i["gene"] for i in ensembl_data) if isinstance(ensembl_data, list) else ensembl_data.get("gene", "-")
@@ -80,9 +81,8 @@ async def _main():
     #         "--matrix", "/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv"
     df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
     ids = df["genes"].tolist()
-    # ids = ids[:20]
     df = await ensembl_to_gene_id_and_symbol(ids=ids)
-    print(df)
+    print(len(df))
 
 
 if __name__ == "__main__":

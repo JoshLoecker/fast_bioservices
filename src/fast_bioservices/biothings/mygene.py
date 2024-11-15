@@ -20,8 +20,11 @@ class MyGene(_AsyncHTTPClient):
         url = f"{self._base_url}/gene"
         chunks = [ids[i : i + self._chunk_size] for i in range(0, len(ids), self._chunk_size)]
         data = [json.dumps({"ids": chunk}) for chunk in chunks]
-        response = (await self._post(url, data=data, headers={"Content-type": "application/json"}))[0]
-        return json.loads(response)
+        responses = await self._post(url, data=data, headers={"Content-type": "application/json"})
+        results = []
+        for result in responses:
+            results.extend(json.loads(result))
+        return results
 
     async def query(self):
         raise NotImplementedError("Not implemented yet")
