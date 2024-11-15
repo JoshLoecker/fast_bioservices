@@ -9,7 +9,7 @@ import pandas as pd
 from loguru import logger
 
 from fast_bioservices.biodbnet.nodes import Input, Output
-from fast_bioservices.common import Taxon, _validate_taxon_id
+from fast_bioservices.common import Taxon, validate_taxon_id
 from fast_bioservices.fast_http import _AsyncHTTPClient
 
 
@@ -50,39 +50,6 @@ class BioDBNet(_AsyncHTTPClient):
             return all([o.value in await self.get_direct_outputs_for_input(value) for o in output_list])
         return all([o.value in await self.get_outputs_for_input(value) for o in output_list])
 
-    # async def _validate_taxon_id(self, taxon: int | str | Taxon | list[int | str | Taxon]) -> list[int]:
-    #     taxon_list: list[int] = []
-    #
-    #     if isinstance(taxon, Taxon):
-    #         taxon_list.append(taxon.value)
-    #     elif isinstance(taxon, int):
-    #         taxon_list.append(taxon)
-    #     elif isinstance(taxon, str):
-    #         logger.warning(f"The provided taxon ID ('{taxon}') is a string, attempting to map it to a known integer value...")
-    #         taxon_list.append(Taxon.from_string(taxon).value)
-    #     elif isinstance(taxon, list):
-    #         for t in taxon:
-    #             if isinstance(t, Taxon):
-    #                 taxon_list.append(t.value)
-    #             elif isinstance(t, int):
-    #                 taxon_list.append(t)
-    #             elif isinstance(t, str):
-    #                 logger.warning(f"The provided taxon ID ('{t}') is a string, attempting to map it to a known integer value...")
-    #                 taxon_list.append(Taxon.from_string(t).value)
-    #     else:
-    #         raise ValueError(f"Unknown taxon type for '{taxon}': {type(taxon)}")
-    #
-    #     for t in taxon_list:
-    #         logger.debug(f"Validating taxon ID '{t}'")
-    #         if t not in Taxon.values():  # All items in the 'Taxon' enum are valid, only need to check items not in enum
-    #             taxon_url: str = f"https://www.ncbi.nlm.nih.gov/taxonomy/?term={t}"
-    #             response = await self._get(taxon_url, temp_disable_cache=True, log_on_complete=False)
-    #             if "No items found." in str(response[0]):
-    #                 raise ValueError(f"Unable to find taxon '{t}'")
-    #     logger.debug(f"Taxon IDs are valid: '{','.join([str(i) for i in taxon_list])}'")
-    #
-    #     return taxon_list
-
     async def get_direct_outputs_for_input(self, value: Input | Output) -> list[str]:
         url = f"{self.url}?method=getdirectoutputsforinput&input={value.value.replace(' ', '').lower()}&directOutput=1"
         outputs = (await self._get(url, temp_disable_cache=True, log_on_complete=False))[0]
@@ -102,7 +69,7 @@ class BioDBNet(_AsyncHTTPClient):
         return valid_outputs["output"]
 
     async def get_all_pathways(self, taxon: Taxon | int, as_dataframe: bool = False) -> pd.DataFrame | list[dict[str, str]]:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
 
         url = f"{self.url}?method=getpathways&pathways=1&taxonId={taxon_id}"
         response = (await self._get(url))[0].decode()
@@ -115,7 +82,7 @@ class BioDBNet(_AsyncHTTPClient):
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
         as_dataframe: bool = True,
     ) -> pd.DataFrame | list[dict[str, str]]:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
 
         if isinstance(pathways, str):
             pathways = [pathways]
@@ -150,7 +117,7 @@ class BioDBNet(_AsyncHTTPClient):
         output_db: Output | list[Output],
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
 
         if not await self._are_nodes_valid(input_db, output_db):
             out_db: list = output_db if isinstance(output_db, list) else [output_db]
@@ -182,7 +149,7 @@ class BioDBNet(_AsyncHTTPClient):
         return df
 
     async def db_walk(self, values: list[str], db_path: list[Input | Output], taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
 
         for i in range(len(db_path) - 1):
             current_db = db_path[i]
@@ -213,7 +180,7 @@ class BioDBNet(_AsyncHTTPClient):
         return df
 
     async def db_report(self, values: list[str], input_db: Input | Output, taxon: Taxon | int = Taxon.HOMO_SAPIENS):
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
         urls: list[str] = []
         for i in range(0, len(values), self._chunk_size):
             urls.append(
@@ -226,7 +193,7 @@ class BioDBNet(_AsyncHTTPClient):
         return NotImplementedError
 
     async def db_find(self, values: list[str], output_db: Output | list[Output], taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
         values = sorted(values)
         urls: list[str] = []
         output_db: list[Output] = [output_db] if isinstance(output_db, Output) else output_db
@@ -253,7 +220,7 @@ class BioDBNet(_AsyncHTTPClient):
         input_taxon: Taxon | int = Taxon.HOMO_SAPIENS,
         output_taxon: Taxon | int = Taxon.MUS_MUSCULUS,
     ):
-        input_taxon_value, output_taxon_value = await asyncio.gather(*[_validate_taxon_id(input_taxon), _validate_taxon_id(output_taxon)])
+        input_taxon_value, output_taxon_value = await asyncio.gather(*[validate_taxon_id(input_taxon), validate_taxon_id(output_taxon)])
 
         if isinstance(output_db, Output):
             output_db = [output_db]
@@ -300,7 +267,7 @@ class BioDBNet(_AsyncHTTPClient):
         ],
         taxon: Taxon | int = Taxon.HOMO_SAPIENS,
     ) -> pd.DataFrame:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
         annotation = [a.replace(" ", "").lower() for a in sorted(annotation)]
 
         values.sort()
@@ -318,7 +285,7 @@ class BioDBNet(_AsyncHTTPClient):
         return pd.DataFrame(responses)
 
     async def db_org(self, input_db: Input, output_db: Output, taxon: Taxon | int = Taxon.HOMO_SAPIENS) -> pd.DataFrame:
-        taxon_id = await _validate_taxon_id(taxon)
+        taxon_id = await validate_taxon_id(taxon)
         input_db_val = input_db.value.replace(" ", "_")
         output_db_val = output_db.value.replace(" ", "_")
 
