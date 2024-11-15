@@ -40,9 +40,8 @@ async def ensembl_to_gene_id_and_symbol(ids: str | list[str], cache: bool = True
     data = {"ensembl_gene_id": [], "entrez_gene_id": [], "gene_symbol": []}
     for result in await MyGene(cache=cache).gene(ids=ids):
         data["ensembl_gene_id"].append(result["ensembl"]["gene"])
-        data["entrez_gene_id"] = result["entrezgene"]
-        data["gene_symbol"].append(result["display_name"])
-        data["gene_symbol"].append(result["symbol"])
+        data["gene_symbol"].append(result["sybmol"])
+        data["gene_symbol"].append(result["symbol"] or "-")
     return pd.DataFrame(data).set_index("ensembl_gene_id", drop=True)
 
 
@@ -51,7 +50,7 @@ async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], cache: bool =
     for result in await MyGene(cache=cache).gene(ids=ids):
         data["entrez_gene_id"].append(result["entrezgene"])
         data["ensembl_gene_id"].append(result["ensembl"]["gene"])
-        data["gene_symbol"].append(result["display_name"])
+        data["gene_symbol"].append(result["symbol"])
     return pd.DataFrame(data).set_index("entrez_gene_id", drop=True)
 
 
