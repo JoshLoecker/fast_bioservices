@@ -58,7 +58,7 @@ async def gene_symbol_to_ensembl_and_gene_id(symbols: str | list[str], taxon: in
     # additionally, some items are double nested (`[[]]`); the first list is removed on the apply, then the second is removed in the applymap
     df["ensembl_gene_id"] = df["ensembl_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0])
     df["entrez_gene_id"] = df["entrez_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0])
-    df = df.applymap(lambda x: x[0] if isinstance(x, list) else x)
+    df = df.map(lambda x: x[0] if isinstance(x, list) else x)
 
     return df
 
