@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import asyncio
-
 import pandas as pd
 
 from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.common import Taxon
-from fast_bioservices.ensembl.lookup import Lookup
-from fast_bioservices.ncbi.datasets import Gene
 
 
 async def determine_gene_type(items: str | list[str], /) -> dict[str, str]:
@@ -34,32 +30,51 @@ async def gene_id_to_ensembl_and_gene_symbol(ids: str | list[str], taxon: int | 
     return pd.DataFrame(data).set_index("entrez_gene_id", drop=True)
 
 
-async def gene_symbol_to_ensembl_and_gene_id(
-    symbols: str | list[str], taxon: int | str | Taxon, cache: bool = True, ncbi_api_key: str = ""
-) -> pd.DataFrame:
+async def gene_symbol_to_ensembl_and_gene_id(symbols: str | list[str], taxon: int | str | Taxon, cache: bool = True) -> pd.DataFrame:
     symbols = [symbols] if isinstance(symbols, str) else symbols
-    lookup = Lookup(cache=cache)
-    gene = Gene(cache=cache, api_key=ncbi_api_key)
-    tasks = [
-        lookup.by_symbol(symbols=symbols, species=taxon),
-        gene.report_by_symbol(symbols=symbols, taxon=taxon),
-    ]
-    ensembl_response, ncbi_response = await asyncio.gather(*tasks)
+    gene = MyGene(cache=cache)
+    responses = await gene.query(items=symbols, taxon=taxon, scopes="symbol")
+    data: dict[str, list[str | pd.NA]] = {"gene_symbol": [], "ensembl_gene_id": [], "entrez_gene_id": []}
+    for response in responses:
+        data["gene_symbol"].append(response["query"])
 
-    data: dict[str, list[str]] = {
-        "gene_symbol": symbols,
-        "ensembl_gene_id": [response["id"] for response in ensembl_response],
-        "entrez_gene_id": [response["gene_id"] for response in ncbi_response["gene"]],
-    }
-    df = pd.DataFrame(data).set_index("gene_symbol", drop=True)
+        if "notfound" in response:
+            data["ensembl_gene_id"].append(pd.NA)
+            data["entrez_gene_id"].append(pd.NA)
+            continue
+
+        data["ensembl_gene_id"].append(response.get("ensembl.gene", pd.NA))
+        data["entrez_gene_id"].append(response.get("entrezgene", pd.NA))
+
+    df = pd.DataFrame(data)
+
+    # combine duplicates of the gene_symbol column
+    df = (
+        df.groupby("gene_symbol")
+        .agg(
+            ensembl_gene_id=("ensembl_gene_id", lambda x: x.dropna().unique().tolist()),
+            entrez_gene_id=("entrez_gene_id", lambda x: x.dropna().unique().tolist()),
+        )
+        .reset_index()
+    )
+    df.set_index("gene_symbol", inplace=True)
+
+    # remove lists in ensembl_gene_id and entrez_gene_id that are created as a result of the aggregate function
+    df["ensembl_gene_id"] = df["ensembl_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0] if len(x) == 1 else x)
+    df["entrez_gene_id"] = df["entrez_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0] if len(x) == 1 else x)
+
     return df
 
 
 async def _main():
-    df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
-    ids = df["genes"].tolist()
-    print(len(ids))
-    df = await ensembl_to_gene_id_and_symbol(ids=ids, taxon=Taxon.MUS_MUSCULUS, cache=False)
+    # df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
+    # ids = df["genes"].tolist()
+    df = await gene_symbol_to_ensembl_and_gene_id(
+        symbols=["MIR1302-2HG", "FAM138A", "OR4F5", "AL627309.1", "AL627309.3", "AL627309.2", "AL627309.5", "AL627309.4", "AP006222.2", "AL732372.1"],
+        # symbols=["MIR1302-2HG", "FAM138A", "OR4F5", "OR4F29", "OR4F16", "LINC01409", "FAM87B", "LINC01128", "LINC00115", "FAM41C"],
+        taxon=Taxon.HOMO_SAPIENS,
+        cache=False,
+    )
     print(df)
 
 
