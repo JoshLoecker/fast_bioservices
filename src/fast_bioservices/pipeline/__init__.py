@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pandas as pd
 
 from fast_bioservices.biothings.mygene import MyGene
@@ -9,7 +11,7 @@ from fast_bioservices.ncbi.datasets import Gene
 
 
 async def determine_gene_type(items: str | list[str], /) -> dict[str, str]:
-    return {i: "ensembl_gene_id" if i.startswith("ENS") else "entrez_gene_id" if i.isdigit() else "gene_symbol" for i in items}
+    return {i: "ensembl_gene_id" if i.startswith("ENS") and i[-1].isdigit() else "entrez_gene_id" if i.isdigit() else "gene_symbol" for i in items}
 
 
 async def ensembl_to_gene_id_and_symbol(ids: str | list[str], taxon: int | str | Taxon, cache: bool = True) -> pd.DataFrame:
@@ -36,9 +38,11 @@ async def gene_symbol_to_ensembl_and_gene_id(
     symbols: str | list[str], taxon: int | str | Taxon, cache: bool = True, ncbi_api_key: str = ""
 ) -> pd.DataFrame:
     symbols = [symbols] if isinstance(symbols, str) else symbols
+    lookup = Lookup(cache=cache)
+    gene = Gene(cache=cache, api_key=ncbi_api_key)
     tasks = [
-        Lookup(cache=cache).by_symbol(symbols=symbols, species=taxon),
-        Gene(cache=cache, api_key=ncbi_api_key).report_by_symbol(symbols=symbols, taxon=taxon),
+        lookup.by_symbol(symbols=symbols, species=taxon),
+        gene.report_by_symbol(symbols=symbols, taxon=taxon),
     ]
     ensembl_response, ncbi_response = await asyncio.gather(*tasks)
 
@@ -52,12 +56,11 @@ async def gene_symbol_to_ensembl_and_gene_id(
 
 
 async def _main():
-    # await determine_gene_type(items=["ENSG00000170558", "1000", "CDH2"], species="human")
-    #         "--matrix", "/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv"
     df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
     ids = df["genes"].tolist()
-    df = await ensembl_to_gene_id_and_symbol(ids=ids, taxon=Taxon.MUS_MUSCULUS)
-    print(len(df))
+    print(len(ids))
+    df = await ensembl_to_gene_id_and_symbol(ids=ids, taxon=Taxon.MUS_MUSCULUS, cache=False)
+    print(df)
 
 
 if __name__ == "__main__":

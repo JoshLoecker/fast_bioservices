@@ -31,18 +31,6 @@ wheels = [
 ]
 
 [[package]]
-name = "anysqlite"
-version = "0.0.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/4b/cd5d66b9f87e773bc71344a368b9472987e33514e6627e28342b9c3e7c43/anysqlite-0.0.5.tar.gz", hash = "sha256:9dfcf87baf6b93426ad1d9118088c41dbf24ef01b445eea4a5d486bac2755cce", size = 3432 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/31/349eae2bc9d9331dd8951684cf94528d91efaa71129dc30822ac111dfc66/anysqlite-0.0.5-py3-none-any.whl", hash = "sha256:cb345dc4f76f6b37f768d7a0b3e9cf5c700dfcb7a6356af8ab46a11f666edbe7", size = 3907 },
-]
-
-[[package]]
 name = "appdirs"
 version = "1.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -111,9 +99,8 @@ version = "0.3.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
-    { name = "anysqlite" },
     { name = "appdirs" },
-    { name = "hishel", extra = ["sqlite"] },
+    { name = "hishel" },
     { name = "httpx" },
     { name = "loguru" },
     { name = "pandas" },
@@ -129,9 +116,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiofiles", specifier = ">=24.1.0" },
-    { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "appdirs", specifier = ">=1.4.4" },
-    { name = "hishel", extras = ["sqlite"], specifier = ">=0.1.1" },
+    { name = "hishel", specifier = ">=0.1.1" },
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "loguru", specifier = ">=0.7.2" },
     { name = "pandas", specifier = ">=2.0.0" },
@@ -172,11 +158,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/10/b9/d7328c8507e45e27784e9c1f440c2b900ae1e60a980480d869b6c0b2553c/hishel-0.1.1.tar.gz", hash = "sha256:1f6421b78cc23fc43c610f651b7848c9b8eee2d29551d64a2ab0d45b319b6559", size = 35615 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/e9/93174034316943513a372e1b92d9ee2394973a63d2a99d6ca6432511eca3/hishel-0.1.1-py3-none-any.whl", hash = "sha256:5b51acc340303faeef2f5cfc1658acb1db1fdc3e3ad76406265a485f9707c5d6", size = 41852 },
-]
-
-[package.optional-dependencies]
-sqlite = [
-    { name = "anysqlite" },
 ]
 
 [[package]]
