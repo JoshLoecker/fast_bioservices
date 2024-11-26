@@ -19,8 +19,7 @@ class MyGene(BioThings):
         :param cache: Should cache be used
         """
         self._base_url: str = "https://mygene.info/v3"
-        self._chunk_size: int = 1000
-        super().__init__(cache=cache, max_requests_per_second=5)
+        super().__init__(cache=cache)
 
     async def __setup_requests(self, ids: str | list[str], taxon: int | str | Taxon) -> _RequestData:
         taxon_id = await validate_taxon_id(taxon)
