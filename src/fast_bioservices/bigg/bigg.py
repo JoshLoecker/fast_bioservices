@@ -60,15 +60,15 @@ class BiGG(_AsyncHTTPClient):
         if download_path is None:
             download_path = f"{model_id}.{ext}"
         elif not download_path.as_posix().endswith(f"{model_id}.{ext}"):
-            download_path = f"{download_path}/{model_id}.{ext}"
+            download_path = download_path / f"{model_id}.{ext}"
 
-        response = await self._get(f"{self.download_url}/{model_id}.{ext}", temp_disable_cache=temp_disable_cache)
+        response = (await self._get(f"{self.download_url}/{model_id}.{ext}", temp_disable_cache=temp_disable_cache))[0]
 
         if ext == "json":
-            json.dump(response[0], download_path.open("w"), indent=2)  # type: ignore
+            json.dump(response, download_path.open("w"), indent=2)  # type: ignore
         else:
             with download_path.open("w") as o_stream:
-                o_stream.write(response[0])
+                o_stream.write(response.decode())
 
     async def model_reactions(
         self,

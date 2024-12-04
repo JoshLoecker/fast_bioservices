@@ -81,10 +81,11 @@ async def test_json(bigg_instance):
 
 @pytest.mark.asyncio
 async def test_download(bigg_instance):
+    ext = "xml"
     with TemporaryDirectory() as tempdir:
         as_path = Path(tempdir)
-        await bigg_instance.download("Recon3D", ext="json.gz", download_path=as_path)
-        assert "Recon3D.json.gz" in list(os.listdir(as_path))
+        await bigg_instance.download("Recon3D", ext=ext, download_path=as_path)
+        assert f"Recon3D.{ext}" in list(os.listdir(as_path))
 
 
 @pytest.mark.asyncio
