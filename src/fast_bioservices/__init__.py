@@ -1,5 +1,5 @@
 __all__ = ["BioDBNet", "Input", "Output", "Taxon", "pipeline"]
-__version__ = "0.3.5"
+__version__ = "0.3.8"
 __description__ = "A fast way to access and convert biological information"
 
 
