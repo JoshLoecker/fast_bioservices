@@ -156,16 +156,17 @@ async def test_db_report(biodbnet_no_cache):
 async def test_db_find(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
     no_cache, with_cache = await asyncio.gather(
         *[
-            biodbnet_no_cache.db_find(values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS),
-            biodbnet_cache.db_find(values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS),
+            biodbnet_no_cache.db_find(values=gene_ids, output_db=Output.GENE_SYMBOL, taxon=Taxon.HOMO_SAPIENS),
+            biodbnet_cache.db_find(values=gene_ids, output_db=Output.GENE_SYMBOL, taxon=Taxon.HOMO_SAPIENS),
         ]
     )
 
     assert len(no_cache) == len(with_cache) == 4
     for id_, symbol in zip(gene_ids, gene_symbols):
         assert id_ in no_cache["InputValue"].values
-        assert id_ in with_cache["InputValue"].values
         assert symbol in no_cache["Gene Symbol"].values
+
+        assert id_ in with_cache["InputValue"].values
         assert symbol in with_cache["Gene Symbol"].values
 
 
