@@ -35,11 +35,6 @@ jobs:
         with:
           args: "format"
 
-      - name: Format Notebook
-        uses: astral-sh/ruff-action@v1
-        with:
-          args: "format main/COMO.ipynb"
-
       - name: Commit Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
