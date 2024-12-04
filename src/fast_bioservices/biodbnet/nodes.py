@@ -4,9 +4,7 @@ from fast_bioservices.common import from_string
 
 
 class Input(Enum):
-    """
-    These are valid input database types for the BioDBNet API.
-    """
+    """These are valid input database types for the BioDBNet API."""
 
     AFFY_GENECHIP_ARRAY = "Affy GeneChip Array"
     AFFY_ID = "Affy ID"
@@ -75,13 +73,12 @@ class Input(Enum):
 
     @classmethod
     def from_string(cls, input_value: str) -> "Input":
+        """Create an Input object from a string."""
         return from_string(input_value, cls)
 
 
 class Output(Enum):
-    """
-    These are valid output database types for the BioDBNet API.
-    """
+    """These are valid output database types for the BioDBNet API."""
 
     AFFY_ANNOTATION = "Affy Annotation"
     AFFY_ID = "Affy ID"
@@ -286,4 +283,5 @@ class Output(Enum):
 
     @classmethod
     def from_string(cls, input_value: str) -> "Output":
+        """Create an Output object from a string."""
         return from_string(input_value, cls)

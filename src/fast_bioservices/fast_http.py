@@ -90,7 +90,11 @@ class _AsyncHTTPClient:
                 force_cache=True,
                 cacheable_methods=["GET", "POST", "HEAD"],
             )
-            self._transport = hishel.AsyncCacheTransport(transport=transport, storage=self._storage, controller=self._controller)
+            self._transport = hishel.AsyncCacheTransport(
+                transport=transport,
+                storage=self._storage,
+                controller=self._controller,
+            )
         else:
             self._transport = transport
         self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
@@ -178,7 +182,10 @@ class _AsyncHTTPClient:
         self._setup_action()
 
         responses: list[bytes] = await asyncio.gather(
-            *[self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions) for url in urls]
+            *[
+                self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions)
+                for url in urls
+            ]
         )
         return responses
 
@@ -203,9 +210,18 @@ class _AsyncHTTPClient:
         responses: list[bytes]
         if isinstance(data, list):
             responses = await asyncio.gather(
-                *[self.__perform_action("post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions) for chunk in data]
+                *[
+                    self.__perform_action(
+                        "post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions
+                    )
+                    for chunk in data
+                ]
             )
         else:
-            responses = [await self.__perform_action("post", url, log_on_complete, data=data, headers=headers, extensions=extensions)]
+            responses = [
+                await self.__perform_action(
+                    "post", url, log_on_complete, data=data, headers=headers, extensions=extensions
+                )
+            ]
 
         return responses
