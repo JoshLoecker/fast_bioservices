@@ -22,9 +22,6 @@ jobs:
       - name: Install Jupyter
         run: uv pip install jupyter nbconvert
 
-      - name: Strip Notebook Output
-        run: uv run jupyter nbconvert --clear-output --inplace "main/COMO.ipynb"
-
       - name: Format Python Imports
         uses: astral-sh/ruff-action@v1
         with:
