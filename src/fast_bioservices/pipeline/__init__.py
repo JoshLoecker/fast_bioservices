@@ -16,15 +16,14 @@ def _show_na_error(
         "gene_symbol_to_ensembl_and_gene_id",
     ],
 ) -> None:
-    if caller_name == "ensembl_to_gene_id_and_symbol":
-        data_types = "Gene ID and Gene Symbol"
-    elif caller_name == "gene_id_to_ensembl_and_gene_symbol":
-        data_types = "Ensembl ID and Gene Symbol"
-    elif caller_name == "gene_symbol_to_ensembl_and_gene_id":
-        data_types = "Ensembl ID and Gene ID"
-    else:
+    data_type = {
+        "ensembl_to_gene_id_and_symbol": "Gene ID and Gene Symbol",
+        "gene_id_to_ensembl_and_gene_symbol": "Ensembl ID and Gene Symbol",
+        "gene_symbol_to_ensembl_and_gene_id": "Ensembl ID and Gene ID",
+    }.get(caller_name, None)
+    if data_type is None:
         raise ValueError("Invalid caller_name")
-    logger.critical(f"All {data_types} values are NA. Did you use the correct Taxon ID? Rerunning without cache.")
+    logger.critical(f"All {data_type} values are NA. Did you use the correct Taxon ID? Rerunning without cache.")
 
 
 async def determine_gene_type(items: str | list[str], /) -> dict[str, str]:
