@@ -7,17 +7,15 @@ from fast_bioservices.fast_http import _AsyncHTTPClient
 
 class _NCBI(_AsyncHTTPClient):
     def __init__(self, *, cache: bool, api_key: str):
-        """
-        API access to NCBI Datasets (v2)
+        """Access to NCBI V2 Datasets.
 
         API documentation: https://www.ncbi.nlm.nih.gov/datasets/docs/v2/api/rest-api
 
         How to create an API key: https://www.ncbi.nlm.nih.gov/datasets/docs/v2/api/api-keys/
 
-        :param cache:
-        :param api_key:
+        :param cache: Should cache be used.
+        :param api_key: an optional API key.
         """
-
         self._chunk_size: int = 5
         self._url: str = "https://api.ncbi.nlm.nih.gov/datasets/v2"
         self._max_requests_per_second: int = 5 if api_key == "" else 10
@@ -41,6 +39,7 @@ class _NCBI(_AsyncHTTPClient):
 
 class Gene(_NCBI):
     def __init__(self, cache: bool = True, api_key: str = ""):
+        """Access gene-specific data of NCBI Datasets."""
         super().__init__(cache=cache, api_key=api_key)
 
     async def _parse_reports(self, queries: list[str]) -> dict[str, list]:
@@ -55,6 +54,7 @@ class Gene(_NCBI):
         return results
 
     async def report_by_id(self, gene_ids: int | str | list[int] | list[str] | list[int | str]) -> dict[str, list]:
+        """Get gene-specific data by gene ID."""
         gene_ids = [gene_ids] if isinstance(gene_ids, (int, str)) else gene_ids
         for g in gene_ids:
             if not g.isdigit():
@@ -67,6 +67,7 @@ class Gene(_NCBI):
         return await self._parse_reports(queries)
 
     async def report_by_symbol(self, symbols: str | list[str], taxon: str) -> dict[str, list]:
+        """Get gene-specific data by gene symbol."""
         symbols = [symbols] if isinstance(symbols, str) else symbols
 
         queries: list[str] = [
@@ -74,17 +75,3 @@ class Gene(_NCBI):
             for chunk in self._create_chunks(symbols)
         ]
         return await self._parse_reports(queries)
-
-
-async def _main():
-    g = Gene()
-    r = await g.report_by_id(["3039", "3040"])
-    print(r)
-    # print(await g.report_by_id(["3039", "3040"]))
-    # print(await g.report_by_symbol(["GNAS", "HBA1"], taxon="9606"))
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(_main())

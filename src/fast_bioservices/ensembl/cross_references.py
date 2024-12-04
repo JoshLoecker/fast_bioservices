@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Literal
 
 from fast_bioservices.common import Taxon
@@ -9,32 +8,9 @@ from fast_bioservices.common.ensembl import get_valid_ensembl_species
 from fast_bioservices.ensembl import Ensembl
 
 
-@dataclass(frozen=True)
-class EnsemblReference:
-    input: str
-    type: str
-    id: str
-
-
-@dataclass(frozen=True)
-class ExternalReference:
-    description: str
-    info_text: str
-    synonyms: list[str]
-    dbname: str
-    info_type: str
-    db_display_name: str
-    display_id: str
-    version: str
-    primary_id: str
-
-    def __post_init__(self):
-        if object.__getattribute__(self, "description") is None:
-            object.__setattr__(self, "description", "")
-
-
 class CrossReference(Ensembl):
     def __init__(self, cache: bool = True):
+        """Cross reference data from ensembl and external sources."""
         super().__init__(cache=cache)
 
     async def by_external(
@@ -45,6 +21,7 @@ class CrossReference(Ensembl):
         external_db_filter: str | None = None,
         feature_filter: str | None = None,
     ):
+        """Collect ensembl-related items from an external database."""
         ensembl_species = await get_valid_ensembl_species(species)
         gene_symbols = [gene_symbols] if isinstance(gene_symbols, str) else gene_symbols
 
@@ -58,7 +35,7 @@ class CrossReference(Ensembl):
             urls.append(self._url + path)
 
         references: list[dict] = []
-        for i, result in enumerate(await self._get(urls=urls, headers={"Content-Type": "application/json"})):
+        for result in await self._get(urls=urls, headers={"Content-Type": "application/json"}):
             references.extend(json.loads(result))
         return references
 
@@ -71,6 +48,7 @@ class CrossReference(Ensembl):
         feature_filter: str | None = None,
         species: str | None = None,
     ) -> dict[str, dict]:
+        """Access external items from an ensembl ID."""
         ids = [ids] if isinstance(ids, str) else ids
 
         urls = []
@@ -94,6 +72,7 @@ class CrossReference(Ensembl):
 
     @property
     def url(self) -> str:
+        """Return the root URL."""
         return self._url
 
 
@@ -101,7 +80,9 @@ async def _main():
     import pandas as pd
 
     c = CrossReference(cache=False)
-    df = pd.read_csv("/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv")
+    df = pd.read_csv(
+        "/Users/joshl/Projects/AcuteRadiationSickness/data/captopril/gene_counts/gene_counts_matrix_full_waterIrradiated24hr.csv"
+    )
     ids = df["genes"].tolist()
 
     await c.by_ensembl(ids=ids)

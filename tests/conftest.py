@@ -1,5 +1,6 @@
 # Used to add src directory to python path before running tests
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+src_dir = Path(__file__).parent.parent / "src"
+sys.path.insert(0, Path(src_dir).resolve().as_posix())
