@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from pathlib import Path
 from typing import Any, Literal, Mapping, Optional
 
 from fast_bioservices.fast_http import _AsyncHTTPClient
@@ -43,12 +46,12 @@ class BiGG(_AsyncHTTPClient):
         self,
         model_id: str,
         ext: Literal["json", "xml", "mat", "json.gz", "xml.gz", "mat.gz"],
-        download_path: Optional[str] = None,
+        download_path: Path | None = None,
         temp_disable_cache: bool = False,
     ) -> None:
         if download_path is None:
             download_path = f"{model_id}.{ext}"
-        elif not download_path.endswith(f"{model_id}.{ext}"):
+        elif not download_path.as_posix().endswith(f"{model_id}.{ext}"):
             download_path = f"{download_path}/{model_id}.{ext}"
 
         response = await self._get(f"{self.download_url}/{model_id}.{ext}", temp_disable_cache=temp_disable_cache)
@@ -64,7 +67,9 @@ class BiGG(_AsyncHTTPClient):
         model_id: str,
         temp_disable_cache: bool = False,
     ) -> Mapping[Any, Any]:
-        response = (await self._get(f"{self.url}/models/{model_id}/reactions", temp_disable_cache=temp_disable_cache))[0]
+        response = (await self._get(f"{self.url}/models/{model_id}/reactions", temp_disable_cache=temp_disable_cache))[
+            0
+        ]
         return json.loads(response)
 
     async def model_reaction_details(

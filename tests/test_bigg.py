@@ -1,66 +1,131 @@
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 
-from fast_bioservices import BiGG
+from fast_bioservices.bigg import BiGG
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def bigg_instance():
-    return BiGG(max_workers=1, cache=False)
+    return BiGG(cache=False)
 
 
-def test_version(bigg_instance):
-    current_version = bigg_instance.version()
+@pytest.mark.asyncio
+async def test_version(bigg_instance):
+    current_version = await bigg_instance.version()
     assert current_version["api_version"] == "v2"
-    assert "bigg_models_version" in current_version.keys()
+    assert "bigg_models_version" in current_version
 
 
-def test_models(bigg_instance):
-    models = bigg_instance.models()
-    assert len(models.keys()) > 0
+@pytest.mark.asyncio
+async def test_models(bigg_instance):
+    models = await bigg_instance.models()
+    assert len(models) > 0
     assert len(models["results"]) > 0
-    assert "results_count" in models.keys()
+    assert "results_count" in models
 
 
-def test_model_details(bigg_instance):
-    recon_3d = bigg_instance.model_details("Recon3D")
-    keys = ["metabolite_count", "reaction_count", "gene_count", "genome_name", "json_size", "xml_size", "mat_size", "json_gz_size", "xml_gz_size", "mat_gz_size", "organism", "genome_ref_string", "reference_type", "reference_id", "model_bigg_id", "published_filename"]  # fmt: skip
-    values = [5835, 10600, 2248, "GCF_000001405.33", "7.5 MB", "27.2 MB", "477.2 MB", "932.1 kB", "1.2 MB", "983.6 kB", "Homo sapiens", "ncbi_assembly:GCF_000001405.33", "pmid", "29457794", "Recon3D", "Recon3D.mat"]  # fmt: skip
+@pytest.mark.asyncio
+async def test_model_details(bigg_instance):
+    recon_3d = await bigg_instance.model_details("Recon3D")
+    keys = [
+        "metabolite_count",
+        "reaction_count",
+        "gene_count",
+        "genome_name",
+        "json_size",
+        "xml_size",
+        "mat_size",
+        "json_gz_size",
+        "xml_gz_size",
+        "mat_gz_size",
+        "organism",
+        "genome_ref_string",
+        "reference_type",
+        "reference_id",
+        "model_bigg_id",
+        "published_filename",
+    ]
+    values = [
+        5835,
+        10600,
+        2248,
+        "GCF_000001405.33",
+        "7.5 MB",
+        "27.2 MB",
+        "477.2 MB",
+        "932.1 kB",
+        "1.2 MB",
+        "983.6 kB",
+        "Homo sapiens",
+        "ncbi_assembly:GCF_000001405.33",
+        "pmid",
+        "29457794",
+        "Recon3D",
+        "Recon3D.mat",
+    ]
 
     for key, value in zip(keys, values):
         assert recon_3d[key] == value
 
-    assert "escher_maps" in recon_3d.keys()
-    assert "last_updated" in recon_3d.keys()
+    assert "escher_maps" in recon_3d
+    assert "last_updated" in recon_3d
 
 
-def test_json(bigg_instance):
-    assert len(bigg_instance.json("Recon3D").keys()) > 0
+@pytest.mark.asyncio
+async def test_json(bigg_instance):
+    assert len(await bigg_instance.json("Recon3D")) > 0
 
 
-def test_download(bigg_instance):
-    download_path = os.getcwd()
-    bigg_instance.download("Recon3D", ext="json.gz", download_path=download_path)
-    assert "Recon3D.json.gz" in list(os.listdir())
-    os.unlink(f"{download_path}/Recon3D.json.gz")
+@pytest.mark.asyncio
+async def test_download(bigg_instance):
+    with TemporaryDirectory() as tempdir:
+        as_path = Path(tempdir)
+        await bigg_instance.download("Recon3D", ext="json.gz", download_path=as_path)
+        assert "Recon3D.json.gz" in list(os.listdir(as_path))
 
 
-def test_model_reactions(bigg_instance):
-    reactions = bigg_instance.model_reactions("Recon3D")
-    assert len(reactions.keys()) > 0
-    assert "results_count" in reactions.keys()
+@pytest.mark.asyncio
+async def test_model_reactions(bigg_instance):
+    reactions = await bigg_instance.model_reactions("Recon3D")
+    assert len(reactions) > 0
+    assert "results_count" in reactions
 
 
-def test_model_reaction_details(bigg_instance):
-    reaction_details = bigg_instance.model_reaction_details("Recon3D", "HEX1")
+@pytest.mark.asyncio
+async def test_model_reaction_details(bigg_instance):
+    reaction_details = await bigg_instance.model_reaction_details("Recon3D", "HEX1")
 
-    general_keys = {"results", "database_links", "escher_maps", "old_identifiers", "bigg_id", "model_bigg_id", "count", "pseudoreaction", "name", "other_models_with_reaction", "metabolites"}  # fmt: skip
-    results_keys = {"exported_reaction_id", "copy_number", "gene_reaction_rule", "upper_bound", "genes", "lower_bound", "objective_coefficient", "subsystem", "reaction_string"}  # fmt: skip
-    database_keys = {"RHEA", "KEGG Reaction", "MetaNetX (MNX) Equation", "BioCyc", "EC Number", "SEED Reaction"}  # fmt: skip
+    general_keys = {
+        "results",
+        "database_links",
+        "escher_maps",
+        "old_identifiers",
+        "bigg_id",
+        "model_bigg_id",
+        "count",
+        "pseudoreaction",
+        "name",
+        "other_models_with_reaction",
+        "metabolites",
+    }
+    results_keys = {
+        "exported_reaction_id",
+        "copy_number",
+        "gene_reaction_rule",
+        "upper_bound",
+        "genes",
+        "lower_bound",
+        "objective_coefficient",
+        "subsystem",
+        "reaction_string",
+    }
+    database_keys = {"RHEA", "KEGG Reaction", "MetaNetX (MNX) Equation", "BioCyc", "EC Number", "SEED Reaction"}
 
     # Check if all elements on right are a part of the left
-    assert set(reaction_details.keys()) >= general_keys
+    assert set(reaction_details) >= general_keys
     assert set(reaction_details["results"][0].keys()) >= results_keys
     assert set(reaction_details["database_links"].keys()) >= database_keys
 
