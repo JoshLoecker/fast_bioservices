@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import contextlib
+import asyncio
 import sys
 import time
 import urllib.parse
-from abc import ABC
-from collections import deque
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from pathlib import Path
-from typing import List
+from typing import Literal, NamedTuple
 
 import hishel
 import httpcore
@@ -19,8 +15,11 @@ from loguru import logger
 
 from fast_bioservices.settings import cache_dir
 
-NO_CACHE: str = "no-store, max-age=0"
-MAX_CACHE: str = f"max-age={sys.maxsize}"
+
+class RequestSetup(NamedTuple):
+    urls: list[str]
+    headers: dict
+    extensions: dict
 
 
 def _key_generator(request: httpx.Request | httpcore.Request, body: bytes = b"") -> str:
@@ -35,175 +34,178 @@ def _key_generator(request: httpx.Request | httpcore.Request, body: bytes = b"")
     key = generate_key(request, body)
     method = request.method.decode("ascii") if isinstance(request.method, bytes) else request.method
     host = request.url.host.decode("ascii") if isinstance(request.url.host, bytes) else request.url.host
-    return f"{method}|{host}|{key}"
+
+    prefix = key[:2]
+    key_dir = cache_dir / prefix
+    key_dir.mkdir(parents=True, exist_ok=True)
+
+    return f"{prefix}/{method}|{host}|{key}"
 
 
-def _get_cache_path(request: httpx.Request) -> Path:
-    return Path(cache_dir, _key_generator(request))
+def _make_safe_url(urls: str | list[str]) -> str | list[str]:
+    safe_chars = "&$+,/:;=?@#"
+    if isinstance(urls, str):
+        return urllib.parse.quote(urls, safe=safe_chars)
+    return sorted(urllib.parse.quote(url, safe=safe_chars) for url in urls)
 
 
-class RateLimit(httpx.BaseTransport):
-    """
-    Implement rate limiting on httpx transports
-    """
+class _AsyncRateLimitTransport(httpx.AsyncBaseTransport):
+    """Implement rate limiting on httpx transports."""
 
-    def __init__(self, transport: httpx.BaseTransport, rate: int | float, period: int | float, use_cache: bool):
-        self.transport = transport
+    def __init__(self, rate: int | float, period: int = 1):
+        self.transport = httpx.AsyncHTTPTransport()
         self.rate = rate  # Requests per second
-        self.period = period  # Time period in seconds
-        self.use_cache = use_cache
+        self.period = period
         self.last_reset = time.time()
-        self.requests_in_period = deque(maxlen=rate)
-        self._cache_storage: hishel.FileStorage | None = None
+        self.requests_in_period = 0
 
-    @property
-    def cache_storage(self):
-        return self._cache_storage
-
-    @cache_storage.setter
-    def cache_storage(self, storage):
-        self._cache_storage = storage
-
-    def _build_from_cache(self, request: Request) -> Response | None:
-        cache_path: Path = _get_cache_path(request)
-        if self.use_cache and request.headers["Cache-Control"] != NO_CACHE and cache_path.exists():
-            cached_response = self._cache_storage.retrieve(cache_path.stem)
-            if isinstance(cached_response, httpcore.Response):
-                return httpx.Response(
-                    status_code=cached_response.status,
-                    headers=cached_response.headers,
-                    content=cached_response.content,
-                    extensions=cached_response.extensions,
-                )
-            return self.transport.handle_request(request)
-        return None
-
-    def handle_request(self, request: Request) -> Response:
-        # Exit early if we are using cache and the key exists
-        is_cached = self._build_from_cache(request)
-        if is_cached is not None:
-            return is_cached
-
+    async def handle_async_request(self, request: Request) -> Response:
         now = time.time()
-        if now - self.last_reset >= self.period:
+        if now - self.last_reset >= self.period:  # We've waited for `period` seconds since last reset, reset counter
             self.last_reset = now
-            self.requests_in_period.clear()
+            self.requests_in_period = 0
 
-        while len(self.requests_in_period) >= self.rate:
-            time.sleep(1 / self.rate)
-            logger.debug(f"Sleeping for {1 / self.rate} seconds")
+        while self.requests_in_period >= self.rate:  # We've hit the rate limit, sleep
+            logger.trace(f"Sleeping for {1 / self.rate} seconds")
+            await asyncio.sleep(1 / self.rate)
             now = time.time()
-            if now - self.last_reset >= self.period:
+            if now - self.last_reset >= self.period:  # Make sure that we've waited long enough
                 self.last_reset = now
-                self.requests_in_period.clear()
+                self.requests_in_period = 0
                 break
 
-        self.requests_in_period.append(now)
-        return self.transport.handle_request(request)
+        self.requests_in_period += 1
+        return await self.transport.handle_async_request(request)
 
 
-class FastHTTP(ABC):
-    def __init__(
-        self,
-        *,
-        cache: bool,
-        workers: int,
-        max_requests_per_second: int | None,
-    ) -> None:
-        self._maximum_allowed_workers: int = 5
+class _AsyncHTTPClient:
+    def __init__(self, *, cache: bool, max_requests_per_second) -> None:
         self._use_cache: bool = cache
-        self._workers: int = self._set_workers(workers)
-        self._transport = RateLimit(transport=httpx.HTTPTransport(), rate=max_requests_per_second, period=1, use_cache=self._use_cache)
+        transport = _AsyncRateLimitTransport(rate=max_requests_per_second)
         if self._use_cache:
-            self._storage = hishel.FileStorage(base_path=cache_dir, ttl=sys.maxsize)
-            self._controller = hishel.Controller(key_generator=_key_generator, allow_stale=True, force_cache=True)
-            self._client: hishel.CacheClient = hishel.CacheClient(storage=self._storage, controller=self._controller, transport=self._transport)
-            self._transport.cache_storage = self._storage
-        else:
-            self._client: httpx.Client = httpx.Client(transport=self._transport)
-
-        self._current_requests: int = 0
-        self._total_requests: int = 0
-        self._thread_pool = ThreadPoolExecutor(max_workers=self._workers)
-
-    def _set_workers(self, value: int) -> int:
-        if value < 1:
-            logger.debug("`max_workers` must be greater than 0, setting to 1")
-            value = 1
-        elif value > self._maximum_allowed_workers:
-            logger.debug(
-                f"`max_workers` must be less than {self._maximum_allowed_workers} (received {value}), setting to {self._maximum_allowed_workers}"
+            self._storage = hishel.AsyncFileStorage(base_path=cache_dir, ttl=sys.maxsize)
+            self._controller = hishel.Controller(
+                key_generator=_key_generator,
+                allow_stale=True,
+                force_cache=True,
+                cacheable_methods=["GET", "POST", "HEAD"],
             )
-            value = self._maximum_allowed_workers
-        return value
+            self._transport = hishel.AsyncCacheTransport(transport=transport, storage=self._storage, controller=self._controller)
+        else:
+            self._transport = transport
+        self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
 
-    @property
-    def workers(self) -> int:
-        return self._workers
+        self._semaphore = asyncio.Semaphore(value=5)
+        self.__current_requests: int = 0
+        self.__total_requests: int = 0
+        self.__log_per_step: int = 1
+        self.__working_time: float = 0.0
+        self.__chunk_time: float = 0.0
+        self.__padding: int = 0
 
-    @workers.setter
-    def workers(self, value: int) -> None:
-        self._workers = self._set_workers(value)
+    def update_rate_limit(self, value: int):
+        self._transport.rate = value
 
-    def __del__(self):
-        with contextlib.suppress(AttributeError):
-            self._thread_pool.shutdown()
+    def _log_callback(self, *, cached: bool):
+        self.__current_requests += 1
 
-    @staticmethod
-    def _make_safe_url(urls: str | List[str]) -> List[str]:
-        # Safe characters from https://stackoverflow.com/questions/695438
-        safe = "&$+,/:;=?@#"
-        if isinstance(urls, str):
-            return [urllib.parse.quote(urls, safe=safe)]
-        return [urllib.parse.quote(url, safe=safe) for url in urls]
+        if self.__current_requests % self.__log_per_step == 0 or self.__current_requests == self.__total_requests:
+            current_time = time.time()
+            working_time = round(current_time - self.__working_time, 1)
+            chunk_time = round(current_time - self.__chunk_time, 1)
+            ending = "with cache" if cached else "without cache"
+            logger.debug(
+                f"Finished {self.__current_requests:>{self.__padding}} of {self.__total_requests} ({ending})"
+                f" - chunk took {chunk_time} seconds"
+                f" - running for {working_time} seconds"
+            )
+            self.__chunk_time = current_time
 
-    def _log_on_complete_callback(self, ending: str):
-        self._current_requests += 1
-        logger.debug(f"Finished {self._current_requests:>{len(str(self._total_requests))}} of {self._total_requests} ({ending})")
-
-    def _do_get(self, url: str, headers: dict, extensions: dict, log_on_complete: bool) -> bytes:
+    async def __perform_action(self, func: Literal["get", "post"], url: str, /, log_on_complete: bool, **kwargs):
         try:
-            with self._transport:
-                response: httpx.Response = self._client.get(url, headers=headers, timeout=60, extensions=extensions)
+            response: httpx.Response
+            async with self._transport, self._semaphore:
+                if func == "get":
+                    response = await self._client.get(url, **kwargs)
+                elif func == "post":
+                    response = await self._client.post(url, **kwargs)
         except httpx.ReadTimeout as e:
-            logger.critical(f"Read timeout error on url: {url}")
-            raise e
+            logger.critical(f"ReadTimeout: Timed out while receiving data from the host: {url}")
+            raise e from httpx.ReadTimeout
         except httpx.ConnectTimeout as e:
-            logger.critical(f"Connect timeout error on url: {url}")
-            raise e
+            logger.critical(f"ConnectTimeout: Timed out while connecting to the host: {url}")
+            raise e from httpx.ConnectTimeout
         except httpx.ConnectError as e:
-            logger.critical(f"Connect error on url: {url}")
-            raise e
+            logger.critical(f"ConnectError: Failed to establish a connection: {url}")
+            raise e from httpx.ConnectError
 
-        if log_on_complete and "from_cache" in response.extensions.keys():
-            if response.extensions["from_cache"]:
-                self._log_on_complete_callback("with cache")
+        if log_on_complete:
+            if response.extensions.get("from_cache"):
+                self._log_callback(cached=True)
             else:
-                self._log_on_complete_callback("without cache")
-
+                self._log_callback(cached=False)
         return response.content
 
-    def _get(
+    def _setup_action(self) -> None:
+        # Show update every 10% with a minimum of every 1000
+        self.__padding = len(str(self.__total_requests))
+
+        self.__working_time = time.time()
+        self.__chunk_time = time.time()
+
+        self.__log_per_step = int(self.__total_requests * 0.1)
+        if self.__log_per_step < 1:
+            self.__log_per_step = 1
+        self.__log_per_step = min(1000, self.__log_per_step)
+        logger.debug(f"Will show progress every {self.__log_per_step} steps ({self.__total_requests} total steps)")
+
+    async def _get(
         self,
-        urls: str | List[str],
+        urls: str | list[str],
         headers: dict | None = None,
         temp_disable_cache: bool = False,
         log_on_complete: bool = True,
         extensions: dict | None = None,
-    ) -> List[bytes]:
-        urls = self._make_safe_url(urls)
-        self._current_requests = 0
-        self._total_requests = len(urls)
-
+    ) -> list[bytes]:
+        # Make urls safe
+        # Safe characters from https://stackoverflow.com/questions/695438
+        urls: list[str] = [_make_safe_url(urls)] if isinstance(urls, str) else _make_safe_url(urls)
+        self.__current_requests = 0
+        self.__total_requests = len(urls)
         headers = headers or {}
-        headers["Cache-Control"] = NO_CACHE if temp_disable_cache else MAX_CACHE
+        extensions = extensions or {}
+        extensions["cache_disabled"] = temp_disable_cache
+        self._setup_action()
 
-        futures: list[Future[bytes]] = []
-        url_mapping: dict[Future, str] = {}
-        for url in urls:
-            future = self._thread_pool.submit(self._do_get, url=url, headers=headers, extensions=extensions, log_on_complete=log_on_complete)
-            futures.append(future)
-            url_mapping[future] = url
+        responses: list[bytes] = await asyncio.gather(
+            *[self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions) for url in urls]
+        )
+        return responses
 
-        responses: List[bytes] = [f.result() for f in as_completed(futures)]
+    async def _post(
+        self,
+        url: str,
+        *,
+        data: str | list[str],
+        headers: dict | None = None,
+        temp_disable_cache: bool = False,
+        log_on_complete: bool = True,
+        extensions: dict | None = None,
+    ) -> list[bytes]:
+        url: str = _make_safe_url(url)
+        self.__current_requests = 0
+        self.__total_requests = 1 if isinstance(data, str) else len(data)
+        headers = headers or {}
+        extensions = extensions or {}
+        extensions["cache_disabled"] = temp_disable_cache
+        self._setup_action()
+
+        responses: list[bytes]
+        if isinstance(data, list):
+            responses = await asyncio.gather(
+                *[self.__perform_action("post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions) for chunk in data]
+            )
+        else:
+            responses = [await self.__perform_action("post", url, log_on_complete, data=data, headers=headers, extensions=extensions)]
+
         return responses

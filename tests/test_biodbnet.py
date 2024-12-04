@@ -25,12 +25,12 @@ def gene_symbols() -> list[str]:
 
 
 def test_dbOrg(biodbnet_no_cache, biodbnet_cache) -> None:
-    result_nocache = biodbnet_no_cache.dbOrg(
+    result_nocache = biodbnet_no_cache.db_org(
         input_db=Input.ENSEMBL_GENE_ID,
         output_db=Output.GENE_ID,
         taxon=Taxon.HOMO_SAPIENS,
     )
-    result_cache = biodbnet_no_cache.dbOrg(
+    result_cache = biodbnet_no_cache.db_org(
         input_db=Input.ENSEMBL_GENE_ID,
         output_db=Output.GENE_ID,
         taxon=Taxon.HOMO_SAPIENS,
@@ -43,8 +43,8 @@ def test_dbOrg(biodbnet_no_cache, biodbnet_cache) -> None:
 
 
 def test_getDirectOutputsForInput(biodbnet_no_cache, biodbnet_cache):
-    result_nocache = biodbnet_no_cache.getDirectOutputsForInput(Input.GENE_ID)
-    result_cache = biodbnet_cache.getDirectOutputsForInput(Input.GENE_ID)
+    result_nocache = biodbnet_no_cache.get_direct_outputs_for_input(Input.GENE_ID)
+    result_cache = biodbnet_cache.get_direct_outputs_for_input(Input.GENE_ID)
 
     assert isinstance(result_nocache, list)
     assert isinstance(result_cache, list)
@@ -53,8 +53,8 @@ def test_getDirectOutputsForInput(biodbnet_no_cache, biodbnet_cache):
 
 
 def test_getInputs(biodbnet_no_cache, biodbnet_cache):
-    result_nocache = biodbnet_no_cache.getInputs()
-    result_cache = biodbnet_cache.getInputs()
+    result_nocache = biodbnet_no_cache.get_inputs()
+    result_cache = biodbnet_cache.get_inputs()
     assert isinstance(result_nocache, list)
     assert isinstance(result_cache, list)
     assert len(result_nocache) > 0
@@ -62,8 +62,8 @@ def test_getInputs(biodbnet_no_cache, biodbnet_cache):
 
 
 def test_getOutputsForInput(biodbnet_no_cache, biodbnet_cache):
-    result_nocache = biodbnet_no_cache.getOutputsForInput(Input.GENE_SYMBOL)
-    result_cache = biodbnet_cache.getOutputsForInput(Input.GENE_SYMBOL)
+    result_nocache = biodbnet_no_cache.get_outputs_for_input(Input.GENE_SYMBOL)
+    result_cache = biodbnet_cache.get_outputs_for_input(Input.GENE_SYMBOL)
     assert isinstance(result_nocache, list)
     assert isinstance(result_cache, list)
     assert len(result_nocache) > 0
@@ -71,14 +71,14 @@ def test_getOutputsForInput(biodbnet_no_cache, biodbnet_cache):
 
 
 def test_db2db(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
-    result_nocache = biodbnet_no_cache.db2db(
-        input_values=gene_ids,
+    result_nocache = biodbnet_no_cache._db2db(
+        values=gene_ids,
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
     )
-    result_cache = biodbnet_cache.db2db(
-        input_values=gene_ids,
+    result_cache = biodbnet_cache._db2db(
+        values=gene_ids,
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         taxon=Taxon.HOMO_SAPIENS,
@@ -97,13 +97,13 @@ def test_db2db(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
 
 
 def test_dbWalk(biodbnet_no_cache, biodbnet_cache):
-    result_nocache = biodbnet_no_cache.dbWalk(
-        input_values=["4318", "1376", "2576", "10089"],
+    result_nocache = biodbnet_no_cache.db_walk(
+        values=["4318", "1376", "2576", "10089"],
         db_path=[Input.GENE_ID, Input.GENE_SYMBOL],
         taxon=Taxon.HOMO_SAPIENS,
     )
-    result_cache = biodbnet_cache.dbWalk(
-        input_values=["4318", "1376", "2576", "10089"],
+    result_cache = biodbnet_cache.db_walk(
+        values=["4318", "1376", "2576", "10089"],
         db_path=[Input.GENE_ID, Input.GENE_SYMBOL],
         taxon=Taxon.HOMO_SAPIENS,
     )
@@ -113,12 +113,12 @@ def test_dbWalk(biodbnet_no_cache, biodbnet_cache):
 
 @pytest.mark.skip(reason="dbReport not yet implemented")
 def test_dbReport(biodbnet_no_cache):
-    biodbnet_no_cache.dbReport(input_values=["4318"], input_db=Input.GENE_ID, taxon=Taxon.HOMO_SAPIENS)
+    biodbnet_no_cache.db_report(values=["4318"], input_db=Input.GENE_ID, taxon=Taxon.HOMO_SAPIENS)
 
 
 def test_dbFind(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
-    result_nocache = biodbnet_no_cache.dbFind(input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS)
-    result_cache = biodbnet_cache.dbFind(input_values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS)
+    result_nocache = biodbnet_no_cache.db_find(values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS)
+    result_cache = biodbnet_cache.db_find(values=gene_ids, output_db=Output.GENE_SYNONYMS, taxon=Taxon.HOMO_SAPIENS)
 
     assert len(result_nocache) == len(result_cache) == 4
     for id_, symbol in zip(gene_ids, gene_symbols):
@@ -129,15 +129,15 @@ def test_dbFind(biodbnet_no_cache, biodbnet_cache, gene_ids, gene_symbols):
 
 
 def test_dbOrtho(biodbnet_no_cache, biodbnet_cache, gene_ids):
-    result_nocache = biodbnet_no_cache.dbOrtho(
-        input_values=gene_ids,
+    result_nocache = biodbnet_no_cache.db_ortho(
+        values=gene_ids,
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         input_taxon=Taxon.HOMO_SAPIENS,
         output_taxon=Taxon.MUS_MUSCULUS,
     )
-    result_cache = biodbnet_cache.dbOrtho(
-        input_values=gene_ids,
+    result_cache = biodbnet_cache.db_ortho(
+        values=gene_ids,
         input_db=Input.GENE_ID,
         output_db=Output.GENE_SYMBOL,
         input_taxon=Taxon.HOMO_SAPIENS,

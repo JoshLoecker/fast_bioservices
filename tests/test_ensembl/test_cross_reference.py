@@ -1,15 +1,16 @@
 import pytest
+
 from fast_bioservices.ensembl.cross_references import CrossReference, EnsemblReference, ExternalReference
 
 
 @pytest.fixture(scope="session")
 def cross_reference() -> CrossReference:
-    return CrossReference(max_workers=1, cache=False)
+    return CrossReference(cache=False)
 
 
 def test_get_ensembl_from_external(cross_reference: CrossReference):
     expected = EnsemblReference(input="BRCA1", type="gene", id="ENSG00000012048")
-    actual = cross_reference.get_ensembl_from_external(species="humans", gene_symbols="BRCA1")[0]
+    actual = cross_reference.by_external(species="humans", gene_symbols="BRCA1")[0]
 
     assert expected.input == actual.input
     assert expected.type == actual.type
@@ -28,7 +29,7 @@ def test_get_external_from_ensembl(cross_reference: CrossReference):
         version="0",
         primary_id="LRG_292",
     )
-    actual = cross_reference.get_external_from_ensembl(ensembl_id="ENSG00000012048")[0]
+    actual = cross_reference.by_ensembl(ids="ENSG00000012048")[0]
 
     assert expected.description == actual.description
     assert expected.info_text == actual.info_text

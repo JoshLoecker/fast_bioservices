@@ -1,6 +1,7 @@
 import os
 
 import pytest
+
 from fast_bioservices import BiGG
 
 
@@ -40,7 +41,7 @@ def test_json(bigg_instance):
 
 def test_download(bigg_instance):
     download_path = os.getcwd()
-    bigg_instance.download("Recon3D", format="json.gz", download_path=download_path)
+    bigg_instance.download("Recon3D", ext="json.gz", download_path=download_path)
     assert "Recon3D.json.gz" in list(os.listdir())
     os.unlink(f"{download_path}/Recon3D.json.gz")
 
