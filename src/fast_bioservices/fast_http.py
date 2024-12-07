@@ -98,7 +98,7 @@ class _AsyncHTTPClient:
         else:
             self._transport = transport
         self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
-        logger.add("hishel.controller", level="TRACE")
+        logger.add("hishel.log", level="TRACE", filter="hishel.controller")
 
         self._semaphore = asyncio.Semaphore(value=5)
         self.__current_requests: int = 0
