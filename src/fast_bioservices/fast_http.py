@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import logging
 import sys
 import time
 import urllib.parse
@@ -14,6 +16,32 @@ from httpx import Request, Response
 from loguru import logger
 
 from fast_bioservices.settings import cache_dir
+
+
+class InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        """Proper capturing of hishel.controller logging and re-emitting using loguru.
+
+        From
+        - https://stackoverflow.com/questions/65329555/standard-library-logging-plus-loguru
+        - https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
+        """
+        # only attempting to capture hishel logs, disregard everything else
+        level = "TRACE"
+        target_logger = "hishel.controller"
+        if record.name != target_logger:
+            return
+
+        # Find caller from where originated the logged message.
+        frame, depth = inspect.currentframe(), 0
+        while frame and (depth == 0 or frame.f_code.co_filename == logging.__file__):
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 
 class RequestSetup(NamedTuple):
