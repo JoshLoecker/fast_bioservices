@@ -98,6 +98,7 @@ class _AsyncHTTPClient:
         else:
             self._transport = transport
         self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
+        logger.add("hishel.controller", level="TRACE")
 
         self._semaphore = asyncio.Semaphore(value=5)
         self.__current_requests: int = 0
@@ -177,7 +178,7 @@ class _AsyncHTTPClient:
         self.__current_requests = 0
         self.__total_requests = len(urls)
         headers = headers or {}
-        extensions = extensions or {}
+        extensions = extensions or {"force_cache": True}
         extensions["cache_disabled"] = temp_disable_cache
         self._setup_action()
 
