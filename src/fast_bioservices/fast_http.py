@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import multiprocessing
 import sys
 import time
 import urllib.parse
@@ -107,6 +108,8 @@ class _AsyncRateLimitTransport(httpx.AsyncBaseTransport):
 
 
 class _AsyncHTTPClient:
+    _lock = multiprocessing.Lock()
+
     def __init__(self, *, cache: bool, max_requests_per_second) -> None:
         self._use_cache: bool = cache
         transport = _AsyncRateLimitTransport(rate=max_requests_per_second)
@@ -210,12 +213,13 @@ class _AsyncHTTPClient:
         extensions["cache_disabled"] = temp_disable_cache
         self._setup_action()
 
-        responses: list[bytes] = await asyncio.gather(
-            *[
-                self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions)
-                for url in urls
-            ]
-        )
+        with self._lock:
+            responses: list[bytes] = await asyncio.gather(
+                *[
+                    self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions)
+                    for url in urls
+                ]
+            )
         return responses
 
     async def _post(
@@ -236,21 +240,22 @@ class _AsyncHTTPClient:
         extensions["cache_disabled"] = temp_disable_cache
         self._setup_action()
 
-        responses: list[bytes]
-        if isinstance(data, list):
-            responses = await asyncio.gather(
-                *[
-                    self.__perform_action(
-                        "post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions
-                    )
-                    for chunk in data
-                ]
-            )
-        else:
-            responses = [
-                await self.__perform_action(
-                    "post", url, log_on_complete, data=data, headers=headers, extensions=extensions
+        with self._lock:
+            responses: list[bytes]
+            if isinstance(data, list):
+                responses = await asyncio.gather(
+                    *[
+                        self.__perform_action(
+                            "post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions
+                        )
+                        for chunk in data
+                    ]
                 )
-            ]
+            else:
+                responses = [
+                    await self.__perform_action(
+                        "post", url, log_on_complete, data=data, headers=headers, extensions=extensions
+                    )
+                ]
 
         return responses
