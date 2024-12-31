@@ -106,6 +106,9 @@ async def gene_symbol_to_ensembl_and_gene_id(
         else:
             data["ensembl_gene_id"].append(value)
 
+    print(f"{len(data['gene_symbol'])=}")
+    print(f"{len(data['ensembl_gene_id'])=}")
+    print(f"{len(data['entrez_gene_id'])=}")
     df = pd.DataFrame(data)
     print(df)
     if rerun_if_na and df["ensembl_gene_id"].isna().all() and df["entrez_gene_id"].isna().all():
