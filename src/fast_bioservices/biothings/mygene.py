@@ -23,7 +23,7 @@ class MyGene(BioThings):
 
     async def __setup_requests(self, ids: str | list[str], taxon: int | str | Taxon) -> _RequestData:
         taxon_id = await validate_taxon_id(taxon)
-        ids = [ids] if isinstance(ids, str) else ids
+        ids = [ids] if isinstance(ids, str) else sorted(ids)
         chunks = [ids[i : i + self._chunk_size] for i in range(0, len(ids), self._chunk_size)]
         return _RequestData(taxon_id=taxon_id, chunks=chunks)
 
@@ -38,7 +38,7 @@ class MyGene(BioThings):
         url = f"{self._base_url}/gene?species={setup.taxon_id}"
         data = [json.dumps({"ids": chunk}) for chunk in setup.chunks]
         responses = await self._post(url, data=data, headers={"Content-type": "application/json"})
-        results = []
+        results: list[dict] = []
         for response in responses:
             results.extend(json.loads(response))
         return results
@@ -48,6 +48,7 @@ class MyGene(BioThings):
         items: list[str],
         taxon: int | str | Taxon,
         scopes: str | list[str] | None = None,
+        fields: str | list[str] = "all",
         ensembl_only: bool = False,
         entrez_only: bool = False,
     ) -> list[dict]:
@@ -56,6 +57,7 @@ class MyGene(BioThings):
         :param items: The items to obtain information for
         :param taxon: The taxon to obtain information for
         :param scopes: The fields to query against. Descriptions can be found at https://docs.mygene.info/en/latest/doc/data.html#available-fields
+        :param fields: The fields to return. Descriptions can be found at https://docs.mygene.info/en/latest/doc/data.html#available-fields
         :param ensembl_only: Only return Ensembl IDs
         :param entrez_only: Only return Entrez IDs
         :return: A list of dictionaries
@@ -66,11 +68,26 @@ class MyGene(BioThings):
         setup = await self.__setup_requests(items, taxon)
         scopes = [scopes] if isinstance(scopes, str) else scopes
 
-        url = f"{self._base_url}/query?species={setup.taxon_id}&size={self._chunk_size}&fields=all&dotfield=true"
-        url += "" if scopes is None else f"&scopes={','.join(scopes)}"
-        data = [json.dumps({"q": chunk}) for chunk in setup.chunks]
+        url = (
+            f"{self._base_url}/query?"
+            f"species={setup.taxon_id}&"
+            f"size={self._chunk_size}&"
+            f"fields={','.join(fields)}&"
+            f"dotfield=true"
+        )
+        url += f"&scopes={','.join(scopes)}" if scopes else ""
+
+        # Iterate through chunks to perform error checking
+        data = []
+        for chunk in setup.chunks:
+            try:
+                as_json = json.dumps({"q": chunk})
+                data.append(as_json)
+            except TypeError as e:  # noqa: PERF203
+                raise TypeError(f"Unable to convert to JSON: {chunk}") from e
+
         responses = await self._post(url, data=data, headers={"Content-type": "application/json"})
-        results = []
+        results: list[dict] = []
         for r in responses:
             results.extend(json.loads(r))
         return results
