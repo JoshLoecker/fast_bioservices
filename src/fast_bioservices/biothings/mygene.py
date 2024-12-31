@@ -67,6 +67,7 @@ class MyGene(BioThings):
 
         setup = await self.__setup_requests(items, taxon)
         scopes = [scopes] if isinstance(scopes, str) else scopes
+        print(f"Number of setup chunks: {len(setup.chunks)}")
 
         url = (
             f"{self._base_url}/query?"
