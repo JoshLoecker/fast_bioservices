@@ -157,7 +157,14 @@ class _AsyncHTTPClient:
             )
             self.__chunk_time = current_time
 
-    async def __perform_action(self, func: Literal["get", "post"], url: str, /, log_on_complete: bool, **kwargs):
+    async def __perform_action(
+        self,
+        func: Literal["get", "post"],
+        url: str,
+        /,
+        log_on_complete: bool,
+        **kwargs,
+    ) -> Response:
         try:
             response: httpx.Response
             async with self._transport, self._semaphore:
@@ -180,7 +187,7 @@ class _AsyncHTTPClient:
                 self._log_callback(cached=True)
             else:
                 self._log_callback(cached=False)
-        return response.content
+        return response
 
     def _setup_action(self) -> None:
         # Show update every 10% with a minimum of every 1000
@@ -213,14 +220,13 @@ class _AsyncHTTPClient:
         extensions["cache_disabled"] = temp_disable_cache
         self._setup_action()
 
-        with self._lock:
-            responses: list[bytes] = await asyncio.gather(
-                *[
-                    self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions)
-                    for url in urls
-                ]
-            )
-        return responses
+        responses: list[Response] = await asyncio.gather(
+            *[
+                self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions)
+                for url in urls
+            ]
+        )
+        return [response.content for response in responses]
 
     async def _post(
         self,
@@ -238,24 +244,25 @@ class _AsyncHTTPClient:
         headers = headers or {}
         extensions = extensions or {}
         extensions["cache_disabled"] = temp_disable_cache
+        if not temp_disable_cache and "cache-control" not in headers:
+            extensions["force_cache"] = True
         self._setup_action()
 
-        with self._lock:
-            responses: list[bytes]
-            if isinstance(data, list):
-                responses = await asyncio.gather(
-                    *[
-                        self.__perform_action(
-                            "post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions
-                        )
-                        for chunk in data
-                    ]
-                )
-            else:
-                responses = [
-                    await self.__perform_action(
-                        "post", url, log_on_complete, data=data, headers=headers, extensions=extensions
+        responses: list[Response]
+        if isinstance(data, list):
+            responses = await asyncio.gather(
+                *[
+                    self.__perform_action(
+                        "post", url, log_on_complete, data=chunk, headers=headers, extensions=extensions
                     )
+                    for chunk in data
                 ]
+            )
+        else:
+            responses = [
+                await self.__perform_action(
+                    "post", url, log_on_complete, data=data, headers=headers, extensions=extensions
+                )
+            ]
 
-        return responses
+        return [response.content for response in responses]

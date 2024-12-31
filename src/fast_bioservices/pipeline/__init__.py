@@ -44,7 +44,9 @@ async def ensembl_to_gene_id_and_symbol(
     rerun_if_na: bool = True,
 ) -> pd.DataFrame:
     data = []
-    for result in await MyGene(cache=cache).gene(ids=ids, taxon=taxon):
+    results = await MyGene(cache=cache).gene(ids=ids, taxon=taxon)
+    print(len(results))
+    for result in results:
         ensembl_data = result.get("ensembl", {})
         ensembl_gene_id = (
             ",".join(i["gene"] for i in ensembl_data)
@@ -103,6 +105,7 @@ async def gene_symbol_to_ensembl_and_gene_id(
         data["entrez_gene_id"].append(response.get("entrezgene", pd.NA))
 
     df = pd.DataFrame(data)
+    print(df)
     if rerun_if_na and df["ensembl_gene_id"].isna().all() and df["entrez_gene_id"].isna().all():
         _show_na_error("gene_symbol_to_ensembl_and_gene_id")
         return await gene_symbol_to_ensembl_and_gene_id(symbols, taxon, cache=False)
@@ -114,7 +117,7 @@ async def gene_symbol_to_ensembl_and_gene_id(
     )
 
     # remove lists in ensembl_gene_id and entrez_gene_id that are created as a result of the aggregate function
-    # additionally, some items are double nested (`[[]]`); the first list is removed on the apply, then the second is removed in the applymap
+    # additionally, some items are double nested (`[[]]`); the first list is removed on the apply, then the second is removed in the map
     df["ensembl_gene_id"] = df["ensembl_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0])
     df["entrez_gene_id"] = df["entrez_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0])
     df = df.map(lambda x: x[0] if isinstance(x, list) else x)
