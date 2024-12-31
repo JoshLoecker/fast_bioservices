@@ -83,6 +83,7 @@ class MyGene(BioThings):
         results: list[dict] = []
         for r in responses:
             results.extend(json.loads(r))
+        print(results[:10])
         return results
 
     async def metadata(self):
