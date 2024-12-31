@@ -93,7 +93,6 @@ async def gene_symbol_to_ensembl_and_gene_id(
     symbols = [symbols] if isinstance(symbols, str) else symbols
     data: dict[str, list[str | pd.NA]] = {"gene_symbol": [], "ensembl_gene_id": [], "entrez_gene_id": []}
     for response in await MyGene(cache=cache).query(items=symbols, taxon=taxon, scopes="symbol"):
-        print(response)
         data["gene_symbol"].append(response["query"])
 
         if "notfound" in response:
@@ -101,8 +100,11 @@ async def gene_symbol_to_ensembl_and_gene_id(
             data["entrez_gene_id"].append(pd.NA)
             continue
 
-        data["ensembl_gene_id"].append(response.get("ensembl.gene", pd.NA))
-        data["entrez_gene_id"].append(response.get("entrezgene", pd.NA))
+        value = str(response["_id"])
+        if value.isdigit():
+            data["entrez_gene_id"].append(value)
+        else:
+            data["ensembl_gene_id"].append(value)
 
     df = pd.DataFrame(data)
     print(df)
