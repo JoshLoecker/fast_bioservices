@@ -78,14 +78,7 @@ class MyGene(BioThings):
         url += f"&scopes={','.join(scopes)}" if scopes else ""
 
         # Iterate through chunks to perform error checking
-        data = []
-        for chunk in setup.chunks:
-            try:
-                as_json = json.dumps({"q": chunk})
-                data.append(as_json)
-            except TypeError as e:  # noqa: PERF203
-                raise TypeError(f"Unable to convert to JSON: {chunk}") from e
-
+        data = [json.dumps({"q": chunk}) for chunk in setup.chunks]
         responses = await self._post(url, data=data, headers={"Content-type": "application/json"})
         results: list[dict] = []
         for r in responses:
