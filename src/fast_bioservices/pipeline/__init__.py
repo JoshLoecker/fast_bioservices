@@ -107,11 +107,15 @@ async def gene_symbol_to_ensembl_and_gene_id(
             data["ensembl_gene_id"].append(value)
 
     with open("gene_symbols.txt", "w") as out:
-        out.write("\n".join(data["gene_symbol"]))
+        # Remove NA values
+        clean = [i for i in data["gene_symbol"] if isinstance(i, str)]
+        out.write("\n".join(clean))
     with open("ensembl_gene_ids.txt", "w") as out:
-        out.write("\n".join(data["ensembl_gene_id"]))
+        clean = [i for i in data["ensembl_gene_id"] if isinstance(i, str)]
+        out.write("\n".join(clean))
     with open("entrez_gene_ids.txt", "w") as out:
-        out.write("\n".join(data["entrez_gene_id"]))
+        clean = [i for i in data["entrez_gene_id"] if isinstance(i, str)]
+        out.write("\n".join(clean))
     df = pd.DataFrame(data)
     print(df)
     if rerun_if_na and df["ensembl_gene_id"].isna().all() and df["entrez_gene_id"].isna().all():
