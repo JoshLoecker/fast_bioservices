@@ -45,7 +45,6 @@ async def ensembl_to_gene_id_and_symbol(
 ) -> pd.DataFrame:
     data = []
     results = await MyGene(cache=cache).gene(ids=ids, taxon=taxon)
-    print(len(results))
     for result in results:
         ensembl_data = result.get("ensembl", {})
         ensembl_gene_id = (
