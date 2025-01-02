@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import NamedTuple
+from typing import Iterable, NamedTuple
 
 from loguru import logger
 
@@ -50,7 +50,7 @@ class MyGene(BioThings):
         items: list[str],
         taxon: int | str | Taxon,
         scopes: str | list[str] | None = None,
-        fields: str | list[str] = "all",
+        fields: str | Iterable[str] = ("all",),
         ensembl_only: bool = False,
         entrez_only: bool = False,
     ) -> list[dict]:
