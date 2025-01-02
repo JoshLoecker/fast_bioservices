@@ -92,32 +92,15 @@ async def gene_symbol_to_ensembl_and_gene_id(
 ) -> pd.DataFrame:
     symbols = [symbols] if isinstance(symbols, str) else symbols
     data: dict[str, list[str | pd.NA]] = {"gene_symbol": [], "ensembl_gene_id": [], "entrez_gene_id": []}
+
+    response: dict
     for response in await MyGene(cache=cache).query(items=symbols, taxon=taxon, scopes="symbol"):
+        is_found = "notfound" not in response
         data["gene_symbol"].append(response["query"])
+        data["entrez_gene_id"].append(response["entrezgene"] if is_found and "entrezgene" in response else pd.NA)
+        data["ensembl_gene_id"].append(response["ensembl.gene"] if is_found and "ensembl.gene" in response else pd.NA)
 
-        if "notfound" in response:
-            data["ensembl_gene_id"].append(pd.NA)
-            data["entrez_gene_id"].append(pd.NA)
-            continue
-
-        value = str(response["_id"])
-        if value.isdigit():
-            data["entrez_gene_id"].append(value)
-        else:
-            data["ensembl_gene_id"].append(value)
-
-    with open("gene_symbols.txt", "w") as out:
-        # Remove NA values
-        clean = [i for i in data["gene_symbol"] if isinstance(i, str)]
-        out.write("\n".join(clean))
-    with open("ensembl_gene_ids.txt", "w") as out:
-        clean = [i for i in data["ensembl_gene_id"] if isinstance(i, str)]
-        out.write("\n".join(clean))
-    with open("entrez_gene_ids.txt", "w") as out:
-        clean = [i for i in data["entrez_gene_id"] if isinstance(i, str)]
-        out.write("\n".join(clean))
     df = pd.DataFrame(data)
-    print(df)
     if rerun_if_na and df["ensembl_gene_id"].isna().all() and df["entrez_gene_id"].isna().all():
         _show_na_error("gene_symbol_to_ensembl_and_gene_id")
         return await gene_symbol_to_ensembl_and_gene_id(symbols, taxon, cache=False)
