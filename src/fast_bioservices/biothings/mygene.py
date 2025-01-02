@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import NamedTuple
 
+from loguru import logger
+
 from fast_bioservices.biothings import BioThings
 from fast_bioservices.common import Taxon, validate_taxon_id
 
@@ -64,10 +66,13 @@ class MyGene(BioThings):
         """
         if ensembl_only and entrez_only:
             raise ValueError("Cannot specify both `ensembl_only` and `entrez_only` as True")
+        if fields == "":
+            logger.warning("Parameter 'fields' cannot be empty, using default of 'all'")
+            fields = ["all"]
+        fields = [fields] if isinstance(fields, str) else fields
 
         setup = await self.__setup_requests(items, taxon)
         scopes = [scopes] if isinstance(scopes, str) else scopes
-        print(f"Number of setup chunks: {len(setup.chunks)}")
 
         url = (
             f"{self._base_url}/query?"
