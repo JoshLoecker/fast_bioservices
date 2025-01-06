@@ -44,7 +44,8 @@ async def ensembl_to_gene_id_and_symbol(
     rerun_if_na: bool = True,
 ) -> pd.DataFrame:
     data = []
-    for result in await MyGene(cache=cache).gene(ids=ids, taxon=taxon):
+    results = await MyGene(cache=cache).gene(ids=ids, taxon=taxon)
+    for result in results:
         ensembl_data = result.get("ensembl", {})
         ensembl_gene_id = (
             ",".join(i["gene"] for i in ensembl_data)
@@ -91,16 +92,13 @@ async def gene_symbol_to_ensembl_and_gene_id(
 ) -> pd.DataFrame:
     symbols = [symbols] if isinstance(symbols, str) else symbols
     data: dict[str, list[str | pd.NA]] = {"gene_symbol": [], "ensembl_gene_id": [], "entrez_gene_id": []}
+
+    response: dict
     for response in await MyGene(cache=cache).query(items=symbols, taxon=taxon, scopes="symbol"):
+        is_found = "notfound" not in response
         data["gene_symbol"].append(response["query"])
-
-        if "notfound" in response:
-            data["ensembl_gene_id"].append(pd.NA)
-            data["entrez_gene_id"].append(pd.NA)
-            continue
-
-        data["ensembl_gene_id"].append(response.get("ensembl.gene", pd.NA))
-        data["entrez_gene_id"].append(response.get("entrezgene", pd.NA))
+        data["entrez_gene_id"].append(response["entrezgene"] if is_found and "entrezgene" in response else pd.NA)
+        data["ensembl_gene_id"].append(response["ensembl.gene"] if is_found and "ensembl.gene" in response else pd.NA)
 
     df = pd.DataFrame(data)
     if rerun_if_na and df["ensembl_gene_id"].isna().all() and df["entrez_gene_id"].isna().all():
@@ -114,7 +112,7 @@ async def gene_symbol_to_ensembl_and_gene_id(
     )
 
     # remove lists in ensembl_gene_id and entrez_gene_id that are created as a result of the aggregate function
-    # additionally, some items are double nested (`[[]]`); the first list is removed on the apply, then the second is removed in the applymap
+    # additionally, some items are double nested (`[[]]`); the first list is removed on the apply, then the second is removed in the map
     df["ensembl_gene_id"] = df["ensembl_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0])
     df["entrez_gene_id"] = df["entrez_gene_id"].apply(lambda x: pd.NA if len(x) == 0 else x[0])
     df = df.map(lambda x: x[0] if isinstance(x, list) else x)
