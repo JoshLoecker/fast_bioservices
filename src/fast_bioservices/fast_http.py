@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json.decoder
 import logging
 import multiprocessing
 import sys
@@ -181,6 +182,9 @@ class _AsyncHTTPClient:
         except httpx.ConnectError as e:
             logger.critical(f"ConnectError: Failed to establish a connection: {url}")
             raise e from httpx.ConnectError
+        except json.decoder.JSONDecodeError:
+            logger.critical(f"JSONDecodeError: Failed to decode JSON response: {url}")
+            raise e from json.decoder.JSONDecodeError
 
         if log_on_complete:
             if response.extensions.get("from_cache"):

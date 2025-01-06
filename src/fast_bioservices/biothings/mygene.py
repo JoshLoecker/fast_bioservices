@@ -80,7 +80,8 @@ class MyGene(BioThings):
             f"species={setup.taxon_id}&"
             f"size={self._chunk_size}&"
             f"fields={','.join(fields)}&"
-            f"dotfield=true"
+            "dotfield=true&"
+            "fetch_all=true"
         )
         url += f"&scopes={','.join(scopes)}" if scopes else ""
 
