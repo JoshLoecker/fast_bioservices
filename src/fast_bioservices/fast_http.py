@@ -182,7 +182,7 @@ class _AsyncHTTPClient:
         except httpx.ConnectError as e:
             logger.critical(f"ConnectError: Failed to establish a connection: {url}")
             raise e from httpx.ConnectError
-        except json.decoder.JSONDecodeError:
+        except json.decoder.JSONDecodeError as e:
             logger.critical(f"JSONDecodeError: Failed to decode JSON response: {url}")
             raise e from json.decoder.JSONDecodeError
 
