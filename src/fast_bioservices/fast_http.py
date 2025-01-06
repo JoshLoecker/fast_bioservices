@@ -187,10 +187,7 @@ class _AsyncHTTPClient:
             raise e from json.decoder.JSONDecodeError
 
         if log_on_complete:
-            if response.extensions.get("from_cache"):
-                self._log_callback(cached=True)
-            else:
-                self._log_callback(cached=False)
+            self._log_callback(cached=response.extensions.get("from_cache", False))
         return response
 
     def _setup_action(self) -> None:
