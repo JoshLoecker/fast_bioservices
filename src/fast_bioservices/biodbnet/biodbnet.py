@@ -177,7 +177,7 @@ class BioDBNet(_AsyncHTTPClient):
             current_db = db_path[i]
             next_db = db_path[i + 1]
 
-            if not self._are_nodes_valid(current_db, next_db, direct_output=True):
+            if not await self._are_nodes_valid(current_db, next_db, direct_output=True):
                 raise ValueError(
                     "You have provided an invalid output database.\n"
                     f"Unable to navigate from '{current_db.value}' to '{next_db.value}'"
