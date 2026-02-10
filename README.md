@@ -1,5 +1,8 @@
 # Fast Bioservices
 
+> [!CAUTION]
+> This repository has been archived as a result of significant changes to the required [Hishel](https://hishel.com) caching package that I don't have time to fix right now.
+
 ## Inspiration
 This package is inspired by [cokelear/bioservices](https://github.com/cokelaer/bioservices). It currently supports functions from [biodbnet](https://biodbnet-abcc.ncifcrf.gov/), but much faster.
 
