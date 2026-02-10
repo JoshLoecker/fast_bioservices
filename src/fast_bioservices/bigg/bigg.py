@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
+
+import anyio
 
 from fast_bioservices.fast_http import _AsyncHTTPClient
 
@@ -59,17 +62,19 @@ class BiGG(_AsyncHTTPClient):
     ) -> None:
         """Download a model in a given format."""
         if download_path is None:
-            download_path = f"{model_id}.{ext}"
+            save_to = Path(f"{model_id}.{ext}")
         elif not download_path.as_posix().endswith(f"{model_id}.{ext}"):
-            download_path = download_path / f"{model_id}.{ext}"
+            save_to = download_path / f"{model_id}.{ext}"
+        else:
+            save_to = download_path
 
         response = (await self._get(f"{self.download_url}/{model_id}.{ext}", temp_disable_cache=temp_disable_cache))[0]
-
-        if ext == "json":
-            json.dump(response, download_path.open("w"), indent=2)  # type: ignore
-        else:
-            with download_path.open("w") as o_stream:
-                o_stream.write(response.decode())
+        async with await anyio.Path(save_to).open("w") as o_stream:
+            if ext == "json":
+                text = json.dumps(response, indent=2)
+                await o_stream.write(text)
+            else:
+                await o_stream.write(response.decode())
 
     async def model_reactions(
         self,
