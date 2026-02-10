@@ -37,7 +37,7 @@ async def test_db_org(biodbnet_no_cache, biodbnet_cache) -> None:
                 output_db=Output.GENE_ID,
                 taxon=Taxon.HOMO_SAPIENS,
             ),
-            biodbnet_no_cache.db_org(
+            biodbnet_cache.db_org(
                 input_db=Input.ENSEMBL_GENE_ID,
                 output_db=Output.GENE_ID,
                 taxon=Taxon.HOMO_SAPIENS,
