@@ -84,7 +84,9 @@ async def test_download(bigg_instance):
     with TemporaryDirectory() as tempdir:
         as_path = anyio.Path(tempdir)
         await bigg_instance.download("Recon3D", ext=ext, download_path=as_path)
-        assert f"Recon3D.{ext}" in [i async for i in as_path.iterdir()]
+        
+        filepaths: list[anyio.Path] = [i async for i in as_path.iterdir()]
+        assert any(i.as_posix().endswith(f"Recon3D.{ext}") for i in filepaths)
 
 
 @pytest.mark.asyncio
