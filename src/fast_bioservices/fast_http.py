@@ -19,7 +19,7 @@ from loguru import logger
 from fast_bioservices.settings import cache_dir
 
 
-def _normalized_url(url: Union[httpcore.URL, str, bytes]) -> str:
+def _normalized_url(url: httpcore.URL | str | bytes) -> str:
     if isinstance(url, str):  # pragma: no cover
         return url
 
@@ -144,7 +144,7 @@ class _AsyncHTTPClient:
         self._use_cache: bool = cache
         transport = _AsyncRateLimitTransport(rate=max_requests_per_second)
         if self._use_cache:
-            self._storage = hishel.AsyncFileStorage(base_path=cache_dir, ttl=sys.maxsize)
+            self._storage = hishel.AsyncFileStorage(base_path=cache_dir, ttl=10518984)  # 4 months
             self._controller = hishel.Controller(
                 key_generator=_key_generator,
                 allow_stale=True,
@@ -176,11 +176,20 @@ class _AsyncHTTPClient:
         self.__current_requests += 1
 
         if self.__current_requests % self.__log_per_step == 0 or self.__current_requests == self.__total_requests:
+            # Go up stack trace until fast_bioservices is not found (i.e., user-called function)
+            stack = inspect.stack()
+            depth = 0
+            for frame in stack:
+                if "fast_bioservices" not in frame.filename:
+                    break
+                depth += 1
+
             current_time = time.time()
             working_time = round(current_time - self.__working_time, 1)
             chunk_time = round(current_time - self.__chunk_time, 1)
             ending = "with cache" if cached else "without cache"
-            logger.debug(
+
+            logger.opt(depth=depth).debug(
                 f"Finished {self.__current_requests:>{self.__padding}} of {self.__total_requests} ({ending})"
                 f" - chunk took {chunk_time} seconds"
                 f" - running for {working_time} seconds"
