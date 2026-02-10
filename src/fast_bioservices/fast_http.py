@@ -5,19 +5,48 @@ import inspect
 import json.decoder
 import logging
 import multiprocessing
-import sys
 import time
 import urllib.parse
-from typing import Literal, NamedTuple
+from hashlib import blake2b
+from typing import Literal, NamedTuple, Union
 
 import hishel
 import httpcore
 import httpx
-from hishel._utils import generate_key
 from httpx import Request, Response
 from loguru import logger
 
 from fast_bioservices.settings import cache_dir
+
+
+def _normalized_url(url: Union[httpcore.URL, str, bytes]) -> str:
+    if isinstance(url, str):  # pragma: no cover
+        return url
+
+    if isinstance(url, bytes):  # pragma: no cover
+        return url.decode("ascii")
+
+    if isinstance(url, httpcore.URL):
+        port = f":{url.port}" if url.port is not None else ""
+        return f"{url.scheme.decode('ascii')}://{url.host.decode('ascii')}{port}{url.target.decode('ascii')}"
+    raise ValueError("Invalid type for `normalized_url`")
+
+
+def generate_key(request: httpcore.Request, body: bytes = b"") -> str:
+    """Generate a cache key.
+
+    :param request: The HTTP request
+    :param body: The body of the request
+    :return: A unique cache key for the request
+    """
+    encoded_url = _normalized_url(request.url).encode("ascii")
+
+    key_parts = [request.method, encoded_url, body]
+
+    key = blake2b(digest_size=16, usedforsecurity=False)
+    for part in key_parts:
+        key.update(part)
+    return key.hexdigest()
 
 
 class InterceptHandler(logging.Handler):
