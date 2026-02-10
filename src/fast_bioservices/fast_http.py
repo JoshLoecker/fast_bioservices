@@ -1,19 +1,78 @@
 from __future__ import annotations
 
 import asyncio
-import sys
+import inspect
+import json.decoder
+import logging
+import multiprocessing
 import time
 import urllib.parse
-from typing import Literal, NamedTuple
+from hashlib import blake2b
+from typing import Literal, NamedTuple, Union
 
 import hishel
 import httpcore
 import httpx
-from hishel._utils import generate_key
 from httpx import Request, Response
 from loguru import logger
 
 from fast_bioservices.settings import cache_dir
+
+
+def _normalized_url(url: httpcore.URL | str | bytes) -> str:
+    if isinstance(url, str):  # pragma: no cover
+        return url
+
+    if isinstance(url, bytes):  # pragma: no cover
+        return url.decode("ascii")
+
+    if isinstance(url, httpcore.URL):
+        port = f":{url.port}" if url.port is not None else ""
+        return f"{url.scheme.decode('ascii')}://{url.host.decode('ascii')}{port}{url.target.decode('ascii')}"
+    raise ValueError("Invalid type for `normalized_url`")
+
+
+def generate_key(request: httpcore.Request, body: bytes = b"") -> str:
+    """Generate a cache key.
+
+    :param request: The HTTP request
+    :param body: The body of the request
+    :return: A unique cache key for the request
+    """
+    encoded_url = _normalized_url(request.url).encode("ascii")
+
+    key_parts = [request.method, encoded_url, body]
+
+    key = blake2b(digest_size=16, usedforsecurity=False)
+    for part in key_parts:
+        key.update(part)
+    return key.hexdigest()
+
+
+class InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        """Proper capturing of hishel.controller logging and re-emitting using loguru.
+
+        From
+        - https://stackoverflow.com/questions/65329555/standard-library-logging-plus-loguru
+        - https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
+        """
+        # only attempting to capture hishel logs, disregard everything else
+        level = "TRACE"
+        target_logger = "hishel.controller"
+        if record.name != target_logger:
+            return
+
+        # Find caller from where originated the logged message.
+        frame, depth = inspect.currentframe(), 0
+        while frame and (depth == 0 or frame.f_code.co_filename == logging.__file__):
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 
 class RequestSetup(NamedTuple):
@@ -79,11 +138,13 @@ class _AsyncRateLimitTransport(httpx.AsyncBaseTransport):
 
 
 class _AsyncHTTPClient:
+    _lock = multiprocessing.Lock()
+
     def __init__(self, *, cache: bool, max_requests_per_second) -> None:
         self._use_cache: bool = cache
         transport = _AsyncRateLimitTransport(rate=max_requests_per_second)
         if self._use_cache:
-            self._storage = hishel.AsyncFileStorage(base_path=cache_dir, ttl=sys.maxsize)
+            self._storage = hishel.AsyncFileStorage(base_path=cache_dir, ttl=10518984)  # 4 months
             self._controller = hishel.Controller(
                 key_generator=_key_generator,
                 allow_stale=True,
@@ -98,6 +159,7 @@ class _AsyncHTTPClient:
         else:
             self._transport = transport
         self._client: httpx.AsyncClient = httpx.AsyncClient(transport=self._transport, timeout=180)
+        logger.add("hishel.log", level="TRACE", filter="hishel.controller")
 
         self._semaphore = asyncio.Semaphore(value=5)
         self.__current_requests: int = 0
@@ -114,18 +176,34 @@ class _AsyncHTTPClient:
         self.__current_requests += 1
 
         if self.__current_requests % self.__log_per_step == 0 or self.__current_requests == self.__total_requests:
+            # Go up stack trace until fast_bioservices is not found (i.e., user-called function)
+            stack = inspect.stack()
+            depth = 0
+            for frame in stack:
+                if "fast_bioservices" not in frame.filename:
+                    break
+                depth += 1
+
             current_time = time.time()
             working_time = round(current_time - self.__working_time, 1)
             chunk_time = round(current_time - self.__chunk_time, 1)
             ending = "with cache" if cached else "without cache"
-            logger.debug(
+
+            logger.opt(depth=depth).debug(
                 f"Finished {self.__current_requests:>{self.__padding}} of {self.__total_requests} ({ending})"
                 f" - chunk took {chunk_time} seconds"
                 f" - running for {working_time} seconds"
             )
             self.__chunk_time = current_time
 
-    async def __perform_action(self, func: Literal["get", "post"], url: str, /, log_on_complete: bool, **kwargs):
+    async def __perform_action(
+        self,
+        func: Literal["get", "post"],
+        url: str,
+        /,
+        log_on_complete: bool,
+        **kwargs,
+    ) -> Response:
         try:
             response: httpx.Response
             async with self._transport, self._semaphore:
@@ -142,13 +220,13 @@ class _AsyncHTTPClient:
         except httpx.ConnectError as e:
             logger.critical(f"ConnectError: Failed to establish a connection: {url}")
             raise e from httpx.ConnectError
+        except json.decoder.JSONDecodeError as e:
+            logger.critical(f"JSONDecodeError: Failed to decode JSON response: {url}")
+            raise e from json.decoder.JSONDecodeError
 
         if log_on_complete:
-            if response.extensions.get("from_cache"):
-                self._log_callback(cached=True)
-            else:
-                self._log_callback(cached=False)
-        return response.content
+            self._log_callback(cached=response.extensions.get("from_cache", False))
+        return response
 
     def _setup_action(self) -> None:
         # Show update every 10% with a minimum of every 1000
@@ -177,17 +255,17 @@ class _AsyncHTTPClient:
         self.__current_requests = 0
         self.__total_requests = len(urls)
         headers = headers or {}
-        extensions = extensions or {}
+        extensions = extensions or {"force_cache": True}
         extensions["cache_disabled"] = temp_disable_cache
         self._setup_action()
 
-        responses: list[bytes] = await asyncio.gather(
+        responses: list[Response] = await asyncio.gather(
             *[
                 self.__perform_action("get", url, log_on_complete, headers=headers, extensions=extensions)
                 for url in urls
             ]
         )
-        return responses
+        return [response.content for response in responses]
 
     async def _post(
         self,
@@ -205,9 +283,11 @@ class _AsyncHTTPClient:
         headers = headers or {}
         extensions = extensions or {}
         extensions["cache_disabled"] = temp_disable_cache
+        if not temp_disable_cache and "cache-control" not in headers:
+            extensions["force_cache"] = True
         self._setup_action()
 
-        responses: list[bytes]
+        responses: list[Response]
         if isinstance(data, list):
             responses = await asyncio.gather(
                 *[
@@ -224,4 +304,4 @@ class _AsyncHTTPClient:
                 )
             ]
 
-        return responses
+        return [response.content for response in responses]

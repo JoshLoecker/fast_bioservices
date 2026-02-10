@@ -1,7 +1,6 @@
-import os
-from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import anyio
 import pytest
 
 from fast_bioservices.bigg import BiGG
@@ -83,9 +82,11 @@ async def test_json(bigg_instance):
 async def test_download(bigg_instance):
     ext = "xml"
     with TemporaryDirectory() as tempdir:
-        as_path = Path(tempdir)
+        as_path = anyio.Path(tempdir)
         await bigg_instance.download("Recon3D", ext=ext, download_path=as_path)
-        assert f"Recon3D.{ext}" in list(os.listdir(as_path))
+        
+        filepaths: list[anyio.Path] = [i async for i in as_path.iterdir()]
+        assert any(i.as_posix().endswith(f"Recon3D.{ext}") for i in filepaths)
 
 
 @pytest.mark.asyncio
